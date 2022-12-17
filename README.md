@@ -1,4 +1,3 @@
-# balooProxy
 A lightweight http anti-ddos reverse-proxy made in golang
 
 ## Features
