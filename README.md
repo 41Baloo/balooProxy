@@ -2,7 +2,7 @@
 
 ### Whitelabeling
 
-The implemented challenges and specifically their design are ment to be code examples and placeholders so the end-user can modify then according to their liking
+The implemented challenges and specifically their design are ment to be code examples and placeholders so the end-user can modify them according to their liking
 
 ### TLS-Fingerprinting
 
