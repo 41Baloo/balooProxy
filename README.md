@@ -1,14 +1,12 @@
 # **Features**
 
 ## **Performance**
----
 
 balooProxy is designed to be as minimalistic as possible. It can be run effectively on extremely cheap servers (which is not to say it has infinite performance. Worse servers will have less performance).
 
 If you find anything that can be improved in the source code, feel free to let me know and/or open a pull request/issue.
 
 ## **DDoS Protection**
----
 
 ### **stages**
 ---
@@ -56,7 +54,6 @@ balooProxy can automatically send alerts to a `discord webhook` whenever your we
 You can use balooProxy behind cloudflare in order to hide your IPv4 address (**Note**: Some features might not work in cloudflare mode. Refer to [Installation](#**Installation**)).
 
 ## **Configurable**
----
 
 You can change almost every setting about balooProxy in your `config.json`.
 
@@ -65,7 +62,6 @@ You can change almost every setting about balooProxy in your `config.json`.
 In order to install balooProxy you need the `config.json` aswell as the compiled version of balooProxy.
 
 ## **Configuration**
----
 
 The `config.json` allows you to change several features and values about balooProxy. There are three main fields, `proxy`, `domains` and `rules`. Example configurations can be found in the `config.json`.
 
@@ -171,7 +167,6 @@ If the number of `total` requests per second is lower than this one **and** if `
 Thanks to [gofilter]("https://github.com/kor44/gofilter") balooProxy allows you to add your own firewall rules by using a ruleset engine based on [wireguards display filter expressions](https://www.wireshark.org/docs/wsug_html_chunked/ChWorkBuildDisplayFilterSection.html).
 
 ## **Fields**
----
 
 ### `ip.src` <sup>IP</sup>
 
@@ -254,7 +249,6 @@ Represents the number of currently incoming requests per second
 Represents the number of currently incoming requests per second forwarded to the backend
 
 ## **Comparison Operatos**
----
 
 Check if two values are identical
 
@@ -316,7 +310,6 @@ Check if value to the right is bigger or equal to the value to the left
 ```
 
 ## **Logical Operators**
----
 
 Require both comparisons to return true
 
@@ -348,7 +341,6 @@ not(http.path eq "/" && http.query eq "")
 ```
 
 ## **Search / Match Operators**
----
 
 
 Returns true if field contains value
@@ -367,7 +359,6 @@ Returns true if field matches a regex expression
 ```
 
 ## **Structure**
----
 
 Firewall rules are build in the `config.json` and have the following structure
 
@@ -387,13 +378,13 @@ Firewall rules are build in the `config.json` and have the following structure
 Every individual has to have the `expression` and `action` field.
 
 ## **Priority**
----
+
 Rules are priorities from top to bottom in the `config.json`. A role has priority over every rule coming after it in the json.
 
 (**Note**: As will later be described, some rules will stop balooProxy from checking for other matching rules. This is why it is recommended to have rules with higher `action` values be higher in the json aswell.)
 
 ## **Actions**
----
+
 
 The resulting action to a rule is decided based on the `"susLv"`, which is a scale from `0`-`3` how suspicious/malicious the request is. The `susLv` itself starts of at the current `stage` balooProxy is in. This is normally `1` but might change to `2` and `3` depending on how many bypassing requests balooProxy currently experiences.
 
@@ -461,7 +452,7 @@ Similar to using `+` can also set a `-` in front of the `action` value. This wil
 In this example, the rule checks whether or not the request is made by a Windows useragent when the `stage` is `3` and decreases the `susLv` by one, making it not show a captcha for Windows users but also not skipping rules that might come after this rule
 
 ## **Examples**
----
+
 ```
 {
     "expression": "(proxy.stage eq 1)",
@@ -496,7 +487,7 @@ This rule-chain only allows `Curl` to make requests to the path `/curl`
 # **Terminal**
 
 ## **Main Hud**
----
+
 
 The main hud shows you different information about your proxy
 
@@ -533,7 +524,6 @@ Shows the current amount of open L4 connections to balooProxy
 Shows information about the last requests that passed balooProxy (The amount can be specified in `config.json`)
 
 ## **Commands**
----
 
 The terminal allows you to input commands which change the behaviour of balooProxy
 
