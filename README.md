@@ -411,7 +411,7 @@ The request will be challenged with a visual captcha. The user will have to inpu
 Every request with a susLv of 4 or higher will be blocked
 
 ## **Adding Actions**
----
+
 You can set a rules action to be a specific action by setting it's `action` to a specific number 
 
 (**Note**: If a rule matches a request and sets the `action` to a specific number balooProxy will not check for other matching rules. Hence you should usually give rules with a higher `action` value a lower `priority` value aswell).
