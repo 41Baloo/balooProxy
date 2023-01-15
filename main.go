@@ -3,6 +3,7 @@ package main
 import (
 	"bufio"
 	"bytes"
+	"context"
 	"crypto/md5"
 	"crypto/tls"
 	"encoding/base64"
@@ -13,6 +14,7 @@ import (
 	"image/color"
 	"image/png"
 	"io"
+	"io/ioutil"
 	"log"
 	"math"
 	"math/rand"
@@ -32,8 +34,7 @@ import (
 	"golang.org/x/image/math/fixed"
 	"golang.org/x/term"
 
-	"github.com/google/gopacket"
-	"github.com/google/gopacket/layers"
+	"github.com/boltdb/bolt"
 	"github.com/inancgumus/screen"
 	"github.com/kor44/gofilter"
 	"github.com/shirou/gopsutil/cpu"
@@ -56,6 +57,7 @@ var (
 
 	domainsMap sync.Map
 	domainList = []string{}
+	boltDb     *bolt.DB
 
 	//Ratelimit values
 	getFingerprintRequestRL int
@@ -134,6 +136,8 @@ func main() {
 
 	//Register custom firewall rules values
 	gofilter.RegisterField("ip.src", gofilter.FT_IP)
+	gofilter.RegisterField("ip.country", gofilter.FT_STRING)
+	gofilter.RegisterField("ip.asn", gofilter.FT_INT)
 	gofilter.RegisterField("ip.engine", gofilter.FT_STRING)
 	gofilter.RegisterField("ip.bot", gofilter.FT_STRING)
 	gofilter.RegisterField("ip.fingerprint", gofilter.FT_STRING)
@@ -227,9 +231,13 @@ func main() {
 			watchedDomain = domainName
 		}
 
-		cert, certErr := tls.LoadX509KeyPair(domains[i].Certificate, domains[i].Key)
-		if certErr != nil {
-			panic("[ " + redText("!") + " ] [ " + redText("Error Loading Certificates: "+certErr.Error()) + " ]")
+		var cert tls.Certificate = tls.Certificate{}
+		if !cloudflareMode {
+			var certErr error = nil
+			cert, certErr = tls.LoadX509KeyPair(domains[i].Certificate, domains[i].Key)
+			if certErr != nil {
+				panic("[ " + redText("!") + " ] [ " + redText("Error Loading Certificates: "+certErr.Error()) + " ]")
+			}
 		}
 
 		fmt.Println("[" + redText("+") + "] [ " + redText("Name") + " ] > " + domains[i].Name)
@@ -241,11 +249,15 @@ func main() {
 		fmt.Println("[ " + redText("Loaded Domain Proxy") + " ]")
 
 		customRules := []Rule{}
+		ipInfo := false
 
 		firewallRules := domains[i].FirewallRules
 		for i := 0; i < len(firewallRules); i++ {
 
 			mutex.Lock()
+			if strings.Contains(firewallRules[i].Expression, "ip.country") || strings.Contains(firewallRules[i].Expression, "ip.asn") {
+				ipInfo = true
+			}
 			f, err := gofilter.NewFilter(firewallRules[i].Expression)
 			if err != nil {
 				panic("[ " + redText("!") + " ] [ Error Loading Custom Firewalls: " + redText(err.Error()) + " ]")
@@ -268,6 +280,12 @@ func main() {
 		fmt.Println("[" + redText("+") + "] [ " + redText("Disable Bypass Stage 2") + " ] > " + fmt.Sprint(domains[i].DisableBypassStage2))
 		fmt.Println("[" + redText("+") + "] [ " + redText("Disable Raw Stage 2") + " ] > " + fmt.Sprint(domains[i].DisableRawStage2))
 
+		dProxy := httputil.NewSingleHostReverseProxy(&url.URL{
+			Scheme: domains[i].Scheme,
+			Host:   domains[i].Backend,
+		})
+		dProxy.Transport = &proxyRoundTripper{}
+
 		domainsMap.Store(domainName, DomainSettings{
 			name:             domainName,
 			stage:            1,
@@ -277,11 +295,9 @@ func main() {
 			lastLogs:         []string{},
 
 			customRules: customRules,
+			ipInfo:      ipInfo,
 
-			domainProxy: httputil.NewSingleHostReverseProxy(&url.URL{
-				Scheme: domains[i].Scheme,
-				Host:   domains[i].Backend,
-			}),
+			domainProxy:        dProxy,
 			domainCertificates: cert,
 			domainWebhooks: WebhookSettings{
 				Url:            domains[i].Webhook.Url,
@@ -313,6 +329,28 @@ func main() {
 	fmt.Println("[ " + redText("Loaded Domains") + " ]")
 	fmt.Println("")
 
+	var boltErr error
+	boltDb, boltErr = bolt.Open("proxyCache.db", 0600, nil)
+	if boltErr != nil {
+		fmt.Println(boltErr)
+		return
+	}
+	//defer boltDb.Close()
+
+	boltDb.Update(func(tx *bolt.Tx) error {
+		var boltErr error
+		_, boltErr = tx.CreateBucketIfNotExists([]byte("countries"))
+		if boltErr != nil {
+			panic("[ " + redText("!") + " ] [ " + redText("Failed To Create Bucket") + " ] > " + boltErr.Error())
+		}
+
+		_, boltErr = tx.CreateBucketIfNotExists([]byte("asns"))
+		if boltErr != nil {
+			panic("[ " + redText("!") + " ] [ " + redText("Failed To Create Bucket") + " ] > " + boltErr.Error())
+		}
+		return nil
+	})
+
 	server := http.Server{}
 
 	//Create http server to redirect to https
@@ -325,7 +363,7 @@ func main() {
 			//Terminate Idle/Inactive connections
 			IdleTimeout:       5 * time.Second,
 			ReadTimeout:       5 * time.Second,
-			WriteTimeout:      5 * time.Second,
+			WriteTimeout:      7 * time.Second,
 			ReadHeaderTimeout: 5 * time.Second,
 		}
 
@@ -337,7 +375,7 @@ func main() {
 			//Terminate Idle/Inactive connections
 			IdleTimeout:       5 * time.Second,
 			ReadTimeout:       5 * time.Second,
-			WriteTimeout:      5 * time.Second,
+			WriteTimeout:      7 * time.Second,
 			ReadHeaderTimeout: 5 * time.Second,
 			TLSConfig: &tls.Config{
 				GetConfigForClient: getConfigForClient,
@@ -350,7 +388,7 @@ func main() {
 			//Terminate Idel/Inactive connections
 			IdleTimeout:       5 * time.Second,
 			ReadTimeout:       5 * time.Second,
-			WriteTimeout:      5 * time.Second,
+			WriteTimeout:      7 * time.Second,
 			ReadHeaderTimeout: 5 * time.Second,
 		}
 
@@ -477,8 +515,17 @@ func main() {
 		}
 
 		//Demonstration of how to use "susLv". Essentially allows you to challenge specific requests with a higher challenge
+
+		ipInfoCountry := "N/A"
+		ipInfoASN := "N/A"
+		if tempDomain.ipInfo {
+			ipInfoCountry, ipInfoASN = getIpInfo(ip)
+		}
+
 		requestVariables := gofilter.Message{
 			"ip.src":                net.ParseIP(ip),
+			"ip.country":            ipInfoCountry,
+			"ip.asn":                ipInfoASN,
 			"ip.engine":             browser,
 			"ip.bot":                botFp,
 			"ip.fingerprint":        tlsFp,
@@ -854,7 +901,7 @@ func main() {
 		case "/_bProxy/fingerprint":
 			w.Header().Set("Content-Type", "text/plain")
 			mutex.Lock()
-			fmt.Fprintf(w, "IP: "+ip+"\nIP Requests: "+fmt.Sprint(ipCount)+"\nIP Challenge Requests: "+fmt.Sprint(accessIpsCookie[ip])+"\nFingerprint: "+tlsFp+"\nBrowser: "+browser+botFp)
+			fmt.Fprintf(w, "IP: "+ip+"\nASN: "+fmt.Sprint(ipInfoASN)+"\nCountry: "+ipInfoCountry+"\nIP Requests: "+fmt.Sprint(ipCount)+"\nIP Challenge Requests: "+fmt.Sprint(accessIpsCookie[ip])+"\nFingerprint: "+tlsFp+"\nBrowser: "+browser+botFp)
 			mutex.Unlock()
 			domainsMap.Store(domainName, tempDomain)
 			return
@@ -863,12 +910,17 @@ func main() {
 			fmt.Fprintf(w, "verified")
 			domainsMap.Store(domainName, tempDomain)
 			return
+		//Do not remove or modify this. It is required by the license
+		case "/_bProxy/credits":
+			w.Header().Set("Content-Type", "text/plain")
+			fmt.Fprintf(w, "BalooProxy; Lightweight http reverse-proxy https://github.com/41Baloo/balooProxy. Protected by GNU GENERAL PUBLIC LICENSE Version 2, June 1991")
+			domainsMap.Store(domainName, tempDomain)
+			return
 		}
 
 		domainsMap.Store(domainName, tempDomain)
 
 		tempDomain.domainProxy.ServeHTTP(w, r)
-
 	})
 
 	//Start ssh based monitor
@@ -971,6 +1023,169 @@ func GetCertificate(clientHello *tls.ClientHelloInfo) (*tls.Certificate, error) 
 		return &tempDomain.domainCertificates, nil
 	}
 	return nil, nil
+}
+
+func (rt *proxyRoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
+
+	//Define 5 second timeout
+	transport := &http.Transport{
+		DialContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
+			return (&net.Dialer{
+				Timeout: 5 * time.Second,
+			}).DialContext(ctx, network, addr)
+		},
+		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+	}
+
+	//Use inbuild RoundTrip
+	resp, err := transport.RoundTrip(req)
+
+	//Connection to backend failed. Display error message
+	if err != nil {
+		errStrs := strings.Split(err.Error(), " ")
+		errMsg := ""
+		for _, str := range errStrs {
+			if !strings.Contains(str, ".") && !strings.Contains(str, "/") {
+				errMsg += str + " "
+			}
+		}
+		errPage := `
+			<!DOCTYPE html>
+			<html>
+			<head>
+			<title>Error: ` + errMsg + `</title>
+			<style>
+				body {
+				font-family: 'Helvetica Neue', sans-serif;
+				color: #333;
+				margin: 0;
+				padding: 0;
+				}
+				.container {
+				display: flex;
+				align-items: center;
+				justify-content: center;
+				height: 100vh;
+				background: #fafafa;
+				}
+				.error-box {
+				width: 600px;
+				padding: 20px;
+				background: #fff;
+				border-radius: 5px;
+				box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+				}
+				.error-box h1 {
+				font-size: 36px;
+				margin-bottom: 20px;
+				}
+				.error-box p {
+				font-size: 16px;
+				line-height: 1.5;
+				margin-bottom: 20px;
+				}
+				.error-box p.description {
+				font-style: italic;
+				color: #666;
+				}
+				.error-box a {
+				display: inline-block;
+				padding: 10px 20px;
+				background: #00b8d4;
+				color: #fff;
+				border-radius: 5px;
+				text-decoration: none;
+				font-size: 16px;
+				}
+			</style>
+			</head>
+			<body>
+			<div class="container">
+				<div class="error-box">
+				<h1>Error: ` + errMsg + `</h1>
+				<p>Sorry, the backend returned an error. That's all we know.</p>
+				<a onclick="location.reload()">Reload page</a>
+				</div>
+			</div>
+			</body>
+			</html>
+		`
+		return &http.Response{
+			StatusCode: http.StatusOK,
+			Body:       ioutil.NopCloser(strings.NewReader(errPage)),
+		}, nil
+	}
+
+	//Connection was successfull, got bad response tho
+	if resp.StatusCode >= 500 {
+		errPage := `
+			<!DOCTYPE html>
+			<html>
+			<head>
+			<title>Error: ` + resp.Status + `</title>
+			<style>
+				body {
+				font-family: 'Helvetica Neue', sans-serif;
+				color: #333;
+				margin: 0;
+				padding: 0;
+				}
+				.container {
+				display: flex;
+				align-items: center;
+				justify-content: center;
+				height: 100vh;
+				background: #fafafa;
+				}
+				.error-box {
+				width: 600px;
+				padding: 20px;
+				background: #fff;
+				border-radius: 5px;
+				box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+				}
+				.error-box h1 {
+				font-size: 36px;
+				margin-bottom: 20px;
+				}
+				.error-box p {
+				font-size: 16px;
+				line-height: 1.5;
+				margin-bottom: 20px;
+				}
+				.error-box p.description {
+				font-style: italic;
+				color: #666;
+				}
+				.error-box a {
+				display: inline-block;
+				padding: 10px 20px;
+				background: #00b8d4;
+				color: #fff;
+				border-radius: 5px;
+				text-decoration: none;
+				font-size: 16px;
+				}
+			</style>
+			</head>
+			<body>
+			<div class="container">
+				<div class="error-box">
+				<h1>Error: ` + resp.Status + `</h1>
+				<p>Sorry, the backend returned an error. That's all we know.</p>
+				<a onclick="location.reload()">Reload page</a>
+				</div>
+			</div>
+			</body>
+			</html>
+		`
+		return &http.Response{
+			StatusCode: http.StatusOK,
+			Body:       ioutil.NopCloser(strings.NewReader(errPage)),
+		}, nil
+	}
+
+	return resp, nil
 }
 
 //FUNCTIONS
@@ -1304,6 +1519,10 @@ func addLogs(entry string, domain DomainSettings) DomainSettings {
 
 func sendWebhook(domain DomainSettings, notificationType int) {
 
+	if domain.domainWebhooks.Url == "" {
+		return
+	}
+
 	webhookContent := Webhook{}
 
 	switch notificationType {
@@ -1359,11 +1578,21 @@ func sendWebhook(domain DomainSettings, notificationType int) {
 		jsonStr := `{"chart":{"type":"line","data":{"datasets":[{"label":"Allowed","backgroundColor":"rgba(35, 159, 217, 0.5)","borderColor":"rgb(35, 159, 217)","fill":false,"data":` + allowedData + `},{"label":"Total","backgroundColor":"rgba(100, 100, 100, 0.5)","borderColor":"rgb(100, 100, 100)","fill":false,"data":` + totalData + `}]},"options":{"responsive":true,"title":{"display":true,"text":"Attack Details"},"scales":{"xAxes":[{"type":"time","display":true,"scaleLabel":{"display":true,"labelString":"Time"},"ticks":{"major":{"enabled":true}}}],"yAxes":[{"display":true,"scaleLabel":{"display":true,"labelString":"Requests"}}]}}}}`
 
 		client := &http.Client{}
-		req, _ := http.NewRequest("POST", "https://quickchart.io/chart/create", bytes.NewBuffer([]byte(jsonStr)))
+		req, reqErr := http.NewRequest("POST", "https://quickchart.io/chart/create", bytes.NewBuffer([]byte(jsonStr)))
+		if reqErr != nil {
+			return
+		}
 		req.Header.Set("Content-Type", "application/json")
-		resp, _ := client.Do(req)
+		resp, respErr := client.Do(req)
 		defer resp.Body.Close()
-		body, _ := io.ReadAll(resp.Body)
+		if respErr != nil {
+			return
+		}
+
+		body, bodyErr := io.ReadAll(resp.Body)
+		if bodyErr != nil {
+			return
+		}
 
 		var chartResp QuickchartResponse
 		json.Unmarshal(body, &chartResp)
@@ -1435,35 +1664,66 @@ func warpImg(src image.Image, displacement func(x, y int) (int, int)) *image.RGB
 	return dst
 }
 
-// You might be able to get this to work. I wasnt.
-func getIPHeaderValues(conn net.Conn) {
-	// Read raw data from the connection into a buffer.
-	var buf [4096]byte
-	n, err := conn.Read(buf[:])
+func getIpInfo(IP string) (country string, asn string) {
+
+	var ipCountry []byte
+	var ipAsn []byte
+
+	boltDb.View(func(tx *bolt.Tx) error {
+		countries := tx.Bucket([]byte("countries"))
+		asns := tx.Bucket([]byte("asns"))
+
+		ipCountry = countries.Get([]byte(IP))
+		ipAsn = asns.Get([]byte(IP))
+
+		return nil
+	})
+
+	//Check if result already in database
+	if string(ipCountry) != "" {
+		return string(ipCountry), string(ipAsn)
+	}
+
+	//If not, request it
+	resp, err := http.Get("http://apimon.de/ip/" + IP)
 	if err != nil {
-		panic("Err1" + err.Error())
+		return "UNK", "UNK"
+	}
+	defer resp.Body.Close()
+
+	body, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return "UNK", "UNK"
 	}
 
-	// Print the number of bytes read and the contents of the buffer.
-	/*
-		fmt.Println("Number of bytes read:", n)
-		fmt.Println("Buffer length:", len(buf[:n]))
-		fmt.Println("Buffer contents:", buf[:n])
-	*/
-
-	// Create a packet decoder.
-	var decoder gopacket.Decoder = layers.LayerTypeIPv4
-
-	// Parse the raw data into a packet.
-	packet := gopacket.NewPacket(buf[:n], decoder, gopacket.Default)
-
-	// Get the IP header values from the packet.
-	ipLayer := packet.Layer(layers.LayerTypeIPv4)
-	ip, ok := ipLayer.(*layers.IPv4)
-	if !ok {
-		panic("Err2" + err.Error())
+	var data IpInfo
+	err = json.Unmarshal(body, &data)
+	if err != nil {
+		return "UNK", "UNK"
 	}
-	fmt.Println("SrcIP: " + ip.SrcIP.String() + " TTL: " + string(ip.TTL) + " DstIP: " + ip.DstIP.String())
+
+	//Write to database for future usage
+	updateErr := boltDb.Update(func(tx *bolt.Tx) error {
+		countries := tx.Bucket([]byte("countries"))
+		asns := tx.Bucket([]byte("asns"))
+
+		// Store a value.
+		err = countries.Put([]byte(IP), []byte(data.Country.Code))
+		if err != nil {
+			return err
+		}
+		err = asns.Put([]byte(IP), []byte(data.AS.Num))
+		if err != nil {
+			return err
+		}
+
+		return nil
+	})
+	if updateErr != nil {
+		return "UNK", "UNK"
+	}
+
+	return data.Country.Code, data.AS.Num
 }
 
 //STRUCTS
@@ -1567,6 +1827,7 @@ type DomainSettings struct {
 	lastLogs         []string
 
 	customRules []Rule
+	ipInfo      bool
 
 	domainProxy        *httputil.ReverseProxy
 	domainCertificates tls.Certificate
@@ -1590,6 +1851,18 @@ type DomainSettings struct {
 	peakRequestsPerSecond         int
 	peakRequestsBypassedPerSecond int
 	RequestLogger                 []RequestLog
+}
+
+type proxyRoundTripper struct {
+}
+
+type IpInfo struct {
+	Country struct {
+		Code string `json:"alpha2_code"`
+	} `json:"country"`
+	AS struct {
+		Num string `json:"number"`
+	} `json:"as"`
 }
 
 type ConnectionWatcher struct {
