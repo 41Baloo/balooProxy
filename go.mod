@@ -3,6 +3,7 @@ module balooProxy
 go 1.19
 
 require (
+	github.com/boltdb/bolt v1.3.1 // indirect
 	github.com/go-ole/go-ole v1.2.6 // indirect
 	github.com/google/gopacket v1.1.19 // indirect
 	github.com/inancgumus/screen v0.0.0-20190314163918-06e984b86ed3 // indirect
