@@ -4,7 +4,7 @@ import (
 	"bufio"
 	"bytes"
 	"context"
-	"crypto/md5"
+	"crypto/sha1"
 	"crypto/tls"
 	"encoding/base64"
 	"encoding/hex"
@@ -472,6 +472,19 @@ func main() {
 
 		//Start the suspicious level where the stage currently is
 		susLv := tempDomain.stage
+		var RCE = []string{"..", ";", "SELECT FROM", "SELECT * FROM", "FROM", "VALUES", "DELETE FROM", "ONION", "union", "UNION", "DROP TABLE", "--", "INSERT INTO", "UPDATE `users` SET", "UPDATE settings SET", "UPDATE `settings` SET", "UPDATE users SET", "WHERE username", "or ", "WHERE id", "DROP TABLE", "0x50", "mid((select", "union(((((((", "concat(0x", "concat(", "OR ", "0x3c62723e3c62723e3c62723e", "0x3c696d67207372633d22", "+#1q%0AuNiOn all#qa%0A#%0AsEleCt", "unhex(hex(Concat(", "Table_schema,0x3e,", "0x00", "0x08", "0x09", "0x0a", "0x0d", "0x1a", "0x22", "0x25", "0x27", "0x5c", "0x5f", "%2F", "exec", "chmod", "chown", "eval", "shell_exec", "curl_multi_exec", "apache_setenv", "..", "passwd", "nc", "netcat", "curl", ";", ";--", "bash", "sh ", "echo", "|", "ping", "cat", "${IFS}", "$", ">", "{", "}", "%", "[", "]", "(", ")", "<", "wget"}
+		decodedValue, err := url.QueryUnescape(r.URL.RawQuery)
+		if err != nil {
+			log.Fatal(err)
+			return
+		}
+		for _, word := range RCE {
+			if strings.Contains(strings.ToUpper(decodedValue), strings.ToUpper(word)) {
+				w.Header().Set("Content-Type", "text/plain")
+				fmt.Fprintf(w, "Blocked by baloo proxy, XSS or RCE attempt detected.")
+				return
+			}
+		}
 
 		//Ratelimit faster if client repeatedly fails the verification challenge (feel free to play around with the threshhold)
 		if ipCountCookie > IPChallengeRequestRL {
@@ -641,152 +654,7 @@ func main() {
 
 				fmt.Fprintf(w,
 					`
-					<html>
-					<head>
-						<style>
-						body {
-							background-color: #f5f5f5;
-							font-family: Arial, sans-serif;
-						}
-						
-						.center {
-							display: flex;
-							align-items: center;
-							justify-content: center;
-							height: 100vh;
-						}
-						
-						.box {
-							background-color: white;
-							border: 1px solid #ddd;
-							border-radius: 4px;
-							padding: 20px;
-							width: 500px;
-						}
-						
-						canvas {
-							display: block;
-							margin: 0 auto;
-							max-width: 100%%;
-							width: 100%%;
-    						height: auto;
-						}
-						
-						input[type="text"] {
-							width: 100%%;
-							padding: 12px 20px;
-							margin: 8px 0;
-							box-sizing: border-box;
-							border: 2px solid #ccc;
-							border-radius: 4px;
-						}
-						
-						button {
-							width: 100%%;
-							background-color: #4caf50;
-							color: white;
-							padding: 14px 20px;
-							margin: 8px 0;
-							border: none;
-							border-radius: 4px;
-							cursor: pointer;
-						}
-						
-						button:hover {
-							background-color: #45a049;
-						}
-						/* Add styles for the animation */
-						
-						.box {
-							background-color: white;
-							border: 1px solid #ddd;
-							border-radius: 4px;
-							padding: 20px;
-							width: 500px;
-							/* Add a transition effect for the height */
-							transition: height 0.1s;
-							position: block;
-						}
-						/* Add a transition effect for the opacity */
-						
-						.box * {
-							transition: opacity 0.1s;
-						}
-						/* Add a success message and style it */
-						
-						.success {
-							background-color: #dff0d8;
-							border: 1px solid #d6e9c6;
-							border-radius: 4px;
-							color: #3c763d;
-							padding: 20px;
-						}
-
-						.failure {
-							background-color: #f0d8d8;
-							border: 1px solid #e9c6c6;
-							border-radius: 4px;
-							color: #763c3c;
-							padding: 20px;
-						}
-						/* Add styles for the collapsible help text */
-						
-						.collapsible {
-							background-color: #f5f5f5;
-							color: #444;
-							cursor: pointer;
-							padding: 18px;
-							width: 100%%;
-							border: none;
-							text-align: left;
-							outline: none;
-							font-size: 15px;
-						}
-						
-						.collapsible:after {
-							content: '\002B';
-							color: #777;
-							font-weight: bold;
-							float: right;
-							margin-left: 5px;
-						}
-						
-						.collapsible.active:after {
-							content: "\2212";
-						}
-						
-						.collapsible:hover {
-							background-color: #e5e5e5;
-						}
-						
-						.collapsible-content {
-							padding: 0 18px;
-							max-height: 0;
-							overflow: hidden;
-							transition: max-height 0.2s ease-out;
-							background-color: #f5f5f5;
-						}
-						</style>
-					</head>
-					<body>
-						<div class="center" id="center">
-							<div class="box" id="box">
-								<h1>Enter the <b>green</b> text you see in the picture</h1>  <canvas id="image" width="100" height="37"></canvas>
-								<form onsubmit="return checkAnswer(event)">
-									<input id="text" type="text" maxlength="6" placeholder="Solution" required>
-									<button type="submit">Submit</button>
-								</form>
-								<div class="success" id="successMessage" style="display: none;">Success! Redirecting ...</div>
-								<div class="failure" id="failMessage" style="display: none;">Failed! Please try again.</div>
-								<button class="collapsible">Why am I seeing this page?</button>
-								<div class="collapsible-content">
-									<p> The website you are trying to visit needs to make sure that you are not a bot. This is a common security measure to protect websites from automated spam and abuse. By entering the characters you see in the picture, you are helping to verify that you are a real person. </p>
-								</div>
-							</div>
-						</div>
-					</body>
-					<script>
-					let canvas=document.getElementById("image");
+					<style>body{background-color:#f5f5f5;font-family:Arial,sans-serif}.center{display:flex;align-items:center;justify-content:center;height:100vh}.box{background-color:#fff;border:1px solid #ddd;border-radius:4px;padding:20px;width:500px}canvas{display:block;margin:0 auto;max-width:100%%;width:100%%;height:auto}input[type=text]{width:100%%;padding:12px 20px;margin:8px 0;box-sizing:border-box;border:2px solid #ccc;border-radius:4px}button{width:100%%;background-color:#4caf50;color:#fff;padding:14px 20px;margin:8px 0;border:none;border-radius:4px;cursor:pointer}button:hover{background-color:#45a049}.box{background-color:#fff;border:1px solid #ddd;border-radius:4px;padding:20px;width:500px;transition:height .1s;position:block}.box *{transition:opacity .1s}.success{background-color:#dff0d8;border:1px solid #d6e9c6;border-radius:4px;color:#3c763d;padding:20px}.failure{background-color:#f0d8d8;border:1px solid #e9c6c6;border-radius:4px;color:#763c3c;padding:20px}.collapsible{background-color:#f5f5f5;color:#444;cursor:pointer;padding:18px;width:100%%;border:none;text-align:left;outline:0;font-size:15px}.collapsible:after{content:'\002B';color:#777;font-weight:700;float:right;margin-left:5px}.collapsible.active:after{content:"\2212"}.collapsible:hover{background-color:#e5e5e5}.collapsible-content{padding:0 18px;max-height:0;overflow:hidden;transition:max-height .2s ease-out;background-color:#f5f5f5}</style><div class=center id=center><div class=box id=box><h1>Enter the <b>green</b> text you see in the picture</h1><canvas height=37 id=image width=100></canvas><form onsubmit="return checkAnswer(event)"><input id=text maxlength=6 placeholder=Solution required> <button type=submit>Submit</button></form><div class=success id=successMessage style=display:none>Success! Redirecting ...</div><div class=failure id=failMessage style=display:none>Failed! Please try again.</div><button class=collapsible>Why am I seeing this page?</button><div class=collapsible-content><p>The website you are trying to visit needs to make sure that you are not a bot. This is a common security measure to protect websites from automated spam and abuse. By entering the characters you see in the picture, you are helping to verify that you are a real person.</div></div></div><script>let canvas=document.getElementById("image");
 					let ctx = canvas.getContext("2d");
 					var image = new Image();
 					image.onload = function() {
@@ -861,8 +729,7 @@ func main() {
 								content.style.maxHeight = content.scrollHeight + "px";
 							}
 						});
-					}
-					</script>
+					}</script>
 					`, captchaData, ip, publicPart)
 				domainsMap.Store(domainName, tempDomain)
 				return
@@ -1049,67 +916,7 @@ func (rt *proxyRoundTripper) RoundTrip(req *http.Request) (*http.Response, error
 				errMsg += str + " "
 			}
 		}
-		errPage := `
-			<!DOCTYPE html>
-			<html>
-			<head>
-			<title>Error: ` + errMsg + `</title>
-			<style>
-				body {
-				font-family: 'Helvetica Neue', sans-serif;
-				color: #333;
-				margin: 0;
-				padding: 0;
-				}
-				.container {
-				display: flex;
-				align-items: center;
-				justify-content: center;
-				height: 100vh;
-				background: #fafafa;
-				}
-				.error-box {
-				width: 600px;
-				padding: 20px;
-				background: #fff;
-				border-radius: 5px;
-				box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-				}
-				.error-box h1 {
-				font-size: 36px;
-				margin-bottom: 20px;
-				}
-				.error-box p {
-				font-size: 16px;
-				line-height: 1.5;
-				margin-bottom: 20px;
-				}
-				.error-box p.description {
-				font-style: italic;
-				color: #666;
-				}
-				.error-box a {
-				display: inline-block;
-				padding: 10px 20px;
-				background: #00b8d4;
-				color: #fff;
-				border-radius: 5px;
-				text-decoration: none;
-				font-size: 16px;
-				}
-			</style>
-			</head>
-			<body>
-			<div class="container">
-				<div class="error-box">
-				<h1>Error: ` + errMsg + `</h1>
-				<p>Sorry, the backend returned an error. That's all we know.</p>
-				<a onclick="location.reload()">Reload page</a>
-				</div>
-			</div>
-			</body>
-			</html>
-		`
+		errPage := `<!DOCTYPE html><title>Error: ` + errMsg + `</title><style>body{font-family:'Helvetica Neue',sans-serif;color:#333;margin:0;padding:0}.container{display:flex;align-items:center;justify-content:center;height:100vh;background:#fafafa}.error-box{width:600px;padding:20px;background:#fff;border-radius:5px;box-shadow:0 2px 4px rgba(0,0,0,.1)}.error-box h1{font-size:36px;margin-bottom:20px}.error-box p{font-size:16px;line-height:1.5;margin-bottom:20px}.error-box p.description{font-style:italic;color:#666}.error-box a{display:inline-block;padding:10px 20px;background:#00b8d4;color:#fff;border-radius:5px;text-decoration:none;font-size:16px}</style><div class=container><div class=error-box><h1>Error: ` + errMsg + `</h1><p>Sorry, the backend returned an error. That's all we know.</p><a onclick=location.reload()>Reload page</a></div></div>`
 		return &http.Response{
 			StatusCode: http.StatusOK,
 			Body:       ioutil.NopCloser(strings.NewReader(errPage)),
@@ -1118,67 +925,7 @@ func (rt *proxyRoundTripper) RoundTrip(req *http.Request) (*http.Response, error
 
 	//Connection was successfull, got bad response tho
 	if resp.StatusCode >= 500 {
-		errPage := `
-			<!DOCTYPE html>
-			<html>
-			<head>
-			<title>Error: ` + resp.Status + `</title>
-			<style>
-				body {
-				font-family: 'Helvetica Neue', sans-serif;
-				color: #333;
-				margin: 0;
-				padding: 0;
-				}
-				.container {
-				display: flex;
-				align-items: center;
-				justify-content: center;
-				height: 100vh;
-				background: #fafafa;
-				}
-				.error-box {
-				width: 600px;
-				padding: 20px;
-				background: #fff;
-				border-radius: 5px;
-				box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-				}
-				.error-box h1 {
-				font-size: 36px;
-				margin-bottom: 20px;
-				}
-				.error-box p {
-				font-size: 16px;
-				line-height: 1.5;
-				margin-bottom: 20px;
-				}
-				.error-box p.description {
-				font-style: italic;
-				color: #666;
-				}
-				.error-box a {
-				display: inline-block;
-				padding: 10px 20px;
-				background: #00b8d4;
-				color: #fff;
-				border-radius: 5px;
-				text-decoration: none;
-				font-size: 16px;
-				}
-			</style>
-			</head>
-			<body>
-			<div class="container">
-				<div class="error-box">
-				<h1>Error: ` + resp.Status + `</h1>
-				<p>Sorry, the backend returned an error. That's all we know.</p>
-				<a onclick="location.reload()">Reload page</a>
-				</div>
-			</div>
-			</body>
-			</html>
-		`
+		errPage := `<!DOCTYPE html><title>Error: ` + resp.Status + `</title><style>body{font-family:'Helvetica Neue',sans-serif;color:#333;margin:0;padding:0}.container{display:flex;align-items:center;justify-content:center;height:100vh;background:#fafafa}.error-box{width:600px;padding:20px;background:#fff;border-radius:5px;box-shadow:0 2px 4px rgba(0,0,0,.1)}.error-box h1{font-size:36px;margin-bottom:20px}.error-box p{font-size:16px;line-height:1.5;margin-bottom:20px}.error-box p.description{font-style:italic;color:#666}.error-box a{display:inline-block;padding:10px 20px;background:#00b8d4;color:#fff;border-radius:5px;text-decoration:none;font-size:16px}</style><div class=container><div class=error-box><h1>Error: ` + resp.Status + `</h1><p>Sorry, the backend returned an error. That's all we know.</p><a onclick=location.reload()>Reload page</a></div></div>`
 		return &http.Response{
 			StatusCode: http.StatusOK,
 			Body:       ioutil.NopCloser(strings.NewReader(errPage)),
@@ -1469,7 +1216,7 @@ func (cw *ConnectionWatcher) Add(c int64) {
 }
 
 func encrypt(input string, key string) string {
-	hasher := md5.New()
+	hasher := sha1.New()
 	hasher.Write([]byte(input + key))
 	return hex.EncodeToString(hasher.Sum(nil))
 }
