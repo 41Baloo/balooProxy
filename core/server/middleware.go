@@ -69,7 +69,7 @@ func Middleware(writer http.ResponseWriter, request *http.Request) {
 		firewall.Mutex.Unlock()
 	}
 
-	writer.Header().Set("baloo-Proxy", "1.3")
+	writer.Header().Set("baloo-Proxy", "1.2")
 
 	//Start the suspicious level where the stage currently is
 	susLv := domain.Stage
