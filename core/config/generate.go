@@ -1,0 +1,95 @@
+package config
+
+import (
+	"encoding/json"
+	"fmt"
+	"goProxy/core/domains"
+	"goProxy/core/utils"
+	"io/ioutil"
+	"strings"
+)
+
+func Generate() {
+
+	fmt.Println("[" + utils.RedText("No Configuration File Found") + "]")
+	fmt.Println("[" + utils.RedText("Configuring Proxy Now") + "]")
+	fmt.Println("")
+
+	gConfig := domains.Configuration{
+		Proxy: domains.Proxy{
+			Cloudflare:   utils.AskBool("Use This Proxy With Cloudflare? (y/N)", false),
+			MaxLogLength: utils.AskInt("How Long Should The Access Logs Be?", 10),
+			AdminSecret:  utils.RandomString(25),
+			Secrets: map[string]string{
+				"cookie":     utils.RandomString(20),
+				"javascript": utils.RandomString(20),
+				"captcha":    utils.RandomString(20),
+			},
+			Ratelimits: map[string]int{
+				"requests":           utils.AskInt("After How Many Requests From An IP Within 2 Minutes Should It Be Blocked?", 1000),
+				"unknownFingerprint": utils.AskInt("After How Many Requests From An Unknown Fingerprint Within 2 Minutes Should It Be Blocked?", 150),
+				"challengeFailures":  utils.AskInt("After How Many Failed Attempts At Solving A Challenge From An IP Within 2 Minutes Should It Be Blocked?", 40),
+				"noRequestsSent":     utils.AskInt("After How Many TCP Connection Attempts Without Sending A Http Request From An IP Within 2 Minutes Should It Be Blocked?", 10),
+			},
+			MaxHeaderSize: utils.AskInt("What Should Be The Maximum Size For Request Headers In Bytes", 3000000),
+			MaxBodySize:   utils.AskInt("What Should Be The Maximum Size For Request Bodies In Bytes", 20000000),
+		},
+		Domains: []domains.Domain{},
+	}
+
+	domains.Config = &gConfig
+
+	jsonConfig, err := json.Marshal(gConfig)
+	if err != nil {
+		panic(err)
+	}
+
+	err = ioutil.WriteFile("config.json", jsonConfig, 0644)
+	if err != nil {
+		panic(err)
+	}
+
+	fmt.Println("")
+	AddDomain()
+
+}
+
+func AddDomain() {
+	fmt.Println("[ " + utils.RedText("No Domain Configurations Found") + " ]")
+	fmt.Println("[ " + utils.RedText("Configure New Domains In The Config.json") + " ]")
+	fmt.Println("")
+	gDomain := domains.Domain{
+		Name:        utils.AskString("What Is The Name Of Your Domain (eg. \"example.com\")", "example.com"),
+		Backend:     utils.AskString("What Is The Backed/Server The Proxy Should Proxy To?", "1.1.1.1"),
+		Scheme:      strings.ToLower(utils.AskString("What Scheme Should The Proxy Use To Communicate With Your Backend? (http/https)", "http")),
+		Certificate: utils.AskString("What Is The Path To The SSL Certificate For Your Domain? (Leave Empty If You Are Using The Proxy Behind Cloudflare)", ""),
+		Key:         utils.AskString("What Is The Path To The SSL Key For Your Domain? (Leave Empty If You Are Using The Proxy Behind Cloudflare)", ""),
+		Webhook: domains.WebhookSettings{
+			Url:            utils.AskString("What Is The Url For Your Discord Webhook? (Leave Empty If You Do Not Want One)", ""),
+			Name:           utils.AskString("What Is The Name For Your Discord Webhook? (Leave Empty If You Do Not Want One)", ""),
+			Avatar:         utils.AskString("What Is The Url For Your Discord Webhook Avatar? (Leave Empty If You Do Not Want One)", ""),
+			AttackStartMsg: utils.AskString("What Is The Message Your Webhook Should Send When Your Website Is Under Attack?", ""),
+			AttackStopMsg:  utils.AskString("What Is The Message Your Webhook Should Send When Your Website Is No Longer Under Attack?", ""),
+		},
+		FirewallRules:       []domains.JsonRule{},
+		CacheRules:          []domains.JsonRule{},
+		BypassStage1:        utils.AskInt("At How Many Bypassing Requests Per Second Would You Like To Activate Stage 2?", 75),
+		BypassStage2:        utils.AskInt("At How Many Bypassing Requests Per Second Would You Like To Activate Stage 3?", 250),
+		DisableBypassStage3: utils.AskInt("How Many Bypassing Requests Per Second Are Low Enough To Disable Stage 3?", 100),
+		DisableRawStage3:    utils.AskInt("How Many Requests Per Second Are Low Enough To Disable Stage 3? (Bypassing Requests Still Have To Be Low Enough)", 250),
+		DisableBypassStage2: utils.AskInt("How Many Bypassing Requests Per Second Are Low Enough To Disable Stage 2?", 50),
+		DisableRawStage2:    utils.AskInt("How Many Requests Per Second Are Low Enough To Disable Stage 2? (Bypassing Requests Still Have To Be Low Enough)", 75),
+	}
+
+	domains.Config.Domains = append(domains.Config.Domains, gDomain)
+
+	jsonConfig, err := json.Marshal(domains.Config)
+	if err != nil {
+		panic(err)
+	}
+
+	err = ioutil.WriteFile("config.json", jsonConfig, 0644)
+	if err != nil {
+		panic(err)
+	}
+}
