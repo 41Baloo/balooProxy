@@ -69,58 +69,6 @@
           "disableRawStage3":250,
           "disableBypassStage2":50,
           "disableRawStage2":75
-       },
-       {
-          "name":"bxv.gg",
-          "backend":"1.1.1.1",
-          "scheme":"http",
-          "certificate":"",
-          "key":"",
-          "webhook":{
-             "url":"",
-             "name":"",
-             "avatar":"",
-             "attack_start_msg":"",
-             "attack_stop_msg":""
-          },
-          "firewallRules":[
-             
-          ],
-          "cacheRules":[
-             
-          ],
-          "bypassStage1":75,
-          "bypassStage2":250,
-          "disableBypassStage3":100,
-          "disableRawStage3":250,
-          "disableBypassStage2":50,
-          "disableRawStage2":75
-       },
-       {
-          "name":"baloo.dog",
-          "backend":"1.1.1.1",
-          "scheme":"http",
-          "certificate":"",
-          "key":"",
-          "webhook":{
-             "url":"",
-             "name":"",
-             "avatar":"",
-             "attack_start_msg":"",
-             "attack_stop_msg":""
-          },
-          "firewallRules":[
-             
-          ],
-          "cacheRules":[
-             
-          ],
-          "bypassStage1":75,
-          "bypassStage2":250,
-          "disableBypassStage3":100,
-          "disableRawStage3":250,
-          "disableBypassStage2":50,
-          "disableRawStage2":75
        }
     ]
  }
