@@ -25,7 +25,6 @@ func Serve() {
 			ReadTimeout:       5 * time.Second,
 			WriteTimeout:      7 * time.Second,
 			ReadHeaderTimeout: 5 * time.Second,
-			ConnState:         firewall.OnStateChange,
 			Addr:              ":80",
 		}
 

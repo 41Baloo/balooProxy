@@ -118,7 +118,7 @@ func Middleware(writer http.ResponseWriter, request *http.Request) {
 	//Block requests with big headers
 	var hb bytes.Buffer
 	request.Header.Write(&hb)
-	if hb.Len() > 3000 {
+	if hb.Len() > domains.Config.Proxy.MaxHeaderSize {
 
 		firewall.Mutex.Lock()
 		firewall.AccessIpsCookie[ip] = firewall.AccessIpsCookie[ip] + 10
@@ -134,7 +134,7 @@ func Middleware(writer http.ResponseWriter, request *http.Request) {
 	for {
 		n, err := request.Body.Read(bb)
 		bodySize += int64(n)
-		if bodySize > 5000 {
+		if bodySize > int64(domains.Config.Proxy.MaxBodySize) {
 			request.Body.Close()
 
 			firewall.Mutex.Lock()
