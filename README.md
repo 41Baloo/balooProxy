@@ -368,10 +368,6 @@ Do not cache and ignore following cache rules that match the request
 
 Use `Path` + `Query` + `Method` as cache-key. Best general action to cache content
 
-### `DEFAULT`
-
-Use `Path` + `Query` + `Method` as cache-key. Best general action to cache content
-
 ### `DEFAULT_STRICT`
 
 Use `Path` + `Query` as cache-key. Be carefull using this, as it might expose private data when used incorrectly

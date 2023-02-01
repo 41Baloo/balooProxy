@@ -1,5 +1,6 @@
 {
     "proxy":{
+       "version": 1.2,
        "cloudflare":false,
        "maxLogLength":10,
        "adminsecret":"8rh32RJxAKgjLTzN0KHtHydn1",
