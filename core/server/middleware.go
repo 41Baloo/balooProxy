@@ -11,6 +11,7 @@ import (
 	"image"
 	"image/color"
 	"image/png"
+	"io"
 	"math"
 	"math/rand"
 	"net"
@@ -130,13 +131,24 @@ func Middleware(writer http.ResponseWriter, request *http.Request) {
 	}
 
 	var bodySize int64
-	bb := make([]byte, 64)
-	for {
-		n, err := request.Body.Read(bb)
-		bodySize += int64(n)
-		if bodySize > int64(domains.Config.Proxy.MaxBodySize) {
-			request.Body.Close()
+	buf := new(bytes.Buffer)
 
+	body := request.Body
+	defer body.Close()
+
+	for {
+		n, err := io.CopyN(buf, body, 1024)
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			http.Error(writer, "Error reading request body", http.StatusBadRequest)
+			return
+		}
+
+		bodySize += n
+
+		if bodySize > int64(domains.Config.Proxy.MaxBodySize) {
 			firewall.Mutex.Lock()
 			firewall.AccessIpsCookie[ip] = firewall.AccessIpsCookie[ip] + 10
 			firewall.Mutex.Unlock()
@@ -145,11 +157,10 @@ func Middleware(writer http.ResponseWriter, request *http.Request) {
 			domains.DomainsMap.Store(domainName, domain)
 			return
 		}
-		if err != nil {
-			break
-		}
 	}
-	request.Body.Close()
+
+	// Reset the request body, so it can be read
+	request.Body = io.NopCloser(buf)
 
 	//Demonstration of how to use "susLv". Essentially allows you to challenge specific requests with a higher challenge
 
