@@ -134,7 +134,6 @@ func Middleware(writer http.ResponseWriter, request *http.Request) {
 	buf := new(bytes.Buffer)
 
 	body := request.Body
-	defer body.Close()
 
 	for {
 		n, err := io.CopyN(buf, body, 1024)
@@ -142,7 +141,7 @@ func Middleware(writer http.ResponseWriter, request *http.Request) {
 			break
 		}
 		if err != nil {
-			http.Error(writer, "Error reading request body", http.StatusBadRequest)
+			http.Error(writer, "balooProxy: Error reading request body: "+err.Error(), http.StatusBadRequest)
 			return
 		}
 
