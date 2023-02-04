@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"goProxy/core/db"
 	"goProxy/core/domains"
+	"goProxy/core/firewall"
 	"goProxy/core/proxy"
 	"goProxy/core/server"
 	"goProxy/core/utils"
@@ -41,6 +42,10 @@ func Load() {
 
 	proxy.MaxHeaderSize = domains.Config.Proxy.MaxHeaderSize
 	proxy.MaxBodySize = domains.Config.Proxy.MaxBodySize
+
+	GetFingerprints("https://raw.githubusercontent.com/41Baloo/balooProxy/main/global/fingerprints/known_fingerprints.json", &firewall.KnwonFingerprints)
+	GetFingerprints("https://raw.githubusercontent.com/41Baloo/balooProxy/main/global/fingerprints/bot_fingerprints.json", &firewall.BotFingerprints)
+	GetFingerprints("https://raw.githubusercontent.com/41Baloo/balooProxy/main/global/fingerprints/malicious_fingerprints.json", &firewall.ForbiddenFingerprints)
 
 	for i, domain := range domains.Config.Domains {
 		domains.Domains = append(domains.Domains, domain.Name)

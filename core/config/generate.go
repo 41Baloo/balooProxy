@@ -2,10 +2,12 @@ package config
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"goProxy/core/domains"
 	"goProxy/core/utils"
 	"io/ioutil"
+	"net/http"
 	"strings"
 )
 
@@ -92,4 +94,23 @@ func AddDomain() {
 	if err != nil {
 		panic(err)
 	}
+}
+
+func GetFingerprints(url string, target *map[string]string) error {
+	resp, err := http.Get(url)
+	if err != nil {
+		return errors.New("failed to fetch fingerprints: " + err.Error())
+	}
+	defer resp.Body.Close()
+
+	body, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return errors.New("failed to fetch fingerprints: " + err.Error())
+	}
+
+	err = json.Unmarshal(body, &target)
+	if err != nil {
+		return errors.New("failed to fetch fingerprints: " + err.Error())
+	}
+	return nil
 }
