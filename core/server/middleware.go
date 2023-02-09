@@ -116,51 +116,6 @@ func Middleware(writer http.ResponseWriter, request *http.Request) {
 		return
 	}
 
-	//Block requests with big headers
-	var hb bytes.Buffer
-	request.Header.Write(&hb)
-	if hb.Len() > domains.Config.Proxy.MaxHeaderSize {
-
-		firewall.Mutex.Lock()
-		firewall.AccessIpsCookie[ip] = firewall.AccessIpsCookie[ip] + 10
-		firewall.Mutex.Unlock()
-
-		fmt.Fprintf(writer, "Blocked by BalooProxy.\nYour request headers or cookies are too big.")
-		domains.DomainsMap.Store(domainName, domain)
-		return
-	}
-
-	var bodySize int64
-	buf := new(bytes.Buffer)
-
-	body := request.Body
-
-	for {
-		n, err := io.CopyN(buf, body, 1024)
-		if err == io.EOF {
-			break
-		}
-		if err != nil {
-			http.Error(writer, "balooProxy: Error reading request body: "+err.Error(), http.StatusBadRequest)
-			return
-		}
-
-		bodySize += n
-
-		if bodySize > int64(domains.Config.Proxy.MaxBodySize) {
-			firewall.Mutex.Lock()
-			firewall.AccessIpsCookie[ip] = firewall.AccessIpsCookie[ip] + 10
-			firewall.Mutex.Unlock()
-
-			fmt.Fprintf(writer, "Blocked by BalooProxy.\nYour request body is too big.")
-			domains.DomainsMap.Store(domainName, domain)
-			return
-		}
-	}
-
-	// Reset the request body, so it can be read
-	request.Body = io.NopCloser(buf)
-
 	//Demonstration of how to use "susLv". Essentially allows you to challenge specific requests with a higher challenge
 
 	ipInfoCountry := "N/A"
@@ -542,6 +497,51 @@ func Middleware(writer http.ResponseWriter, request *http.Request) {
 	}
 
 	domain.BypassedRequests++
+
+	//Block requests with big headers
+	var hb bytes.Buffer
+	request.Header.Write(&hb)
+	if hb.Len() > domains.Config.Proxy.MaxHeaderSize {
+
+		firewall.Mutex.Lock()
+		firewall.AccessIpsCookie[ip] = firewall.AccessIpsCookie[ip] + 10
+		firewall.Mutex.Unlock()
+
+		fmt.Fprintf(writer, "Blocked by BalooProxy.\nYour request headers or cookies are too big.")
+		domains.DomainsMap.Store(domainName, domain)
+		return
+	}
+
+	var bodySize int64
+	buf := new(bytes.Buffer)
+
+	body := request.Body
+
+	for {
+		n, err := io.CopyN(buf, body, 10240)
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			fmt.Fprintf(writer, "balooProxy: Error reading request body: "+err.Error())
+			return
+		}
+
+		bodySize += n
+
+		if bodySize > int64(domains.Config.Proxy.MaxBodySize) {
+			firewall.Mutex.Lock()
+			firewall.AccessIpsCookie[ip] = firewall.AccessIpsCookie[ip] + 10
+			firewall.Mutex.Unlock()
+
+			fmt.Fprintf(writer, "Blocked by BalooProxy.\nYour request body is too big.")
+			domains.DomainsMap.Store(domainName, domain)
+			return
+		}
+	}
+
+	// Reset the request body, so it can be read
+	request.Body = io.NopCloser(buf)
 
 	//Reserved proxy-paths
 	switch request.URL.Path {

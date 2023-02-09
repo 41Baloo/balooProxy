@@ -5,7 +5,6 @@ import (
 	"goProxy/core/server"
 	"io"
 	"log"
-	"time"
 )
 
 func main() {
@@ -19,7 +18,5 @@ func main() {
 	go server.Monitor()
 
 	//Keep server running
-	for {
-		time.Sleep(1 * time.Second)
-	}
+	select {}
 }
