@@ -11,7 +11,6 @@ import (
 	"image"
 	"image/color"
 	"image/png"
-	"io"
 	"math"
 	"math/rand"
 	"net"
@@ -151,11 +150,6 @@ func Middleware(writer http.ResponseWriter, request *http.Request) {
 		"proxy.rps":           domain.RequestsPerSecond,
 		"proxy.rpsAllowed":    domain.RequestsBypassedPerSecond,
 	}
-
-	ctx := context.WithValue(request.Context(), "filter", requestVariables)
-	request = request.WithContext(ctx)
-	ctx = context.WithValue(request.Context(), "domain", domain)
-	request = request.WithContext(ctx)
 
 	susLv = firewall.EvalFirewallRule(domain, requestVariables, susLv)
 
@@ -498,50 +492,10 @@ func Middleware(writer http.ResponseWriter, request *http.Request) {
 
 	domain.BypassedRequests++
 
-	//Block requests with big headers
-	var hb bytes.Buffer
-	request.Header.Write(&hb)
-	if hb.Len() > domains.Config.Proxy.MaxHeaderSize {
-
-		firewall.Mutex.Lock()
-		firewall.AccessIpsCookie[ip] = firewall.AccessIpsCookie[ip] + 10
-		firewall.Mutex.Unlock()
-
-		fmt.Fprintf(writer, "Blocked by BalooProxy.\nYour request headers or cookies are too big.")
-		domains.DomainsMap.Store(domainName, domain)
-		return
-	}
-
-	var bodySize int64
-	buf := new(bytes.Buffer)
-
-	body := request.Body
-
-	for {
-		n, err := io.CopyN(buf, body, 10240)
-		if err == io.EOF {
-			break
-		}
-		if err != nil {
-			fmt.Fprintf(writer, "balooProxy: Error reading request body: "+err.Error())
-			return
-		}
-
-		bodySize += n
-
-		if bodySize > int64(domains.Config.Proxy.MaxBodySize) {
-			firewall.Mutex.Lock()
-			firewall.AccessIpsCookie[ip] = firewall.AccessIpsCookie[ip] + 10
-			firewall.Mutex.Unlock()
-
-			fmt.Fprintf(writer, "Blocked by BalooProxy.\nYour request body is too big.")
-			domains.DomainsMap.Store(domainName, domain)
-			return
-		}
-	}
-
-	// Reset the request body, so it can be read
-	request.Body = io.NopCloser(buf)
+	ctx := context.WithValue(request.Context(), "filter", requestVariables)
+	request = request.WithContext(ctx)
+	ctx = context.WithValue(request.Context(), "domain", domain)
+	request = request.WithContext(ctx)
 
 	//Reserved proxy-paths
 	switch request.URL.Path {

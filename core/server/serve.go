@@ -97,49 +97,51 @@ func (rt *RoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
 
 		cacheRes = evalCache(domainSettings, messages)
 
-		var cacheResponse any
-		cacheOk := false
-		cacheKey := ""
+		if cacheRes != 0 {
+			var cacheResponse any
+			cacheOk := false
+			cacheKey := ""
 
-		switch cacheRes {
-		case proxy.CACHE_DEFAULT:
-			cacheKey = req.Host + req.URL.Path + req.URL.RawQuery + req.Method
-		case proxy.CACHE_DEFAULT_STRICT:
-			cacheKey = req.Host + req.URL.Path + req.URL.RawQuery
-		case proxy.CACHE_CAREFUL:
-			reqIP = strings.Split(req.RemoteAddr, ":")[0]
-			cacheKey = req.Host + reqIP + req.URL.Path + req.URL.RawQuery + req.Method
-		case proxy.CACHE_CAREFUL_STRICT:
-			reqIP = strings.Split(req.RemoteAddr, ":")[0]
-			cacheKey = req.Host + reqIP + req.URL.Path + req.URL.RawQuery
-		case proxy.CACHE_IGNORE_QUERY:
-			cacheKey = req.Host + req.URL.Path
-		case proxy.CACHE_QUERY:
-			cacheKey = req.Host + req.URL.RawQuery
-		case proxy.CACHE_CLIENTIP:
-			reqIP = strings.Split(req.RemoteAddr, ":")[0]
-			cacheKey = req.Host + reqIP
-		default:
-		}
+			switch cacheRes {
+			case proxy.CACHE_DEFAULT:
+				cacheKey = req.Host + req.URL.Path + req.URL.RawQuery + req.Method
+			case proxy.CACHE_DEFAULT_STRICT:
+				cacheKey = req.Host + req.URL.Path + req.URL.RawQuery
+			case proxy.CACHE_CAREFUL:
+				reqIP = strings.Split(req.RemoteAddr, ":")[0]
+				cacheKey = req.Host + reqIP + req.URL.Path + req.URL.RawQuery + req.Method
+			case proxy.CACHE_CAREFUL_STRICT:
+				reqIP = strings.Split(req.RemoteAddr, ":")[0]
+				cacheKey = req.Host + reqIP + req.URL.Path + req.URL.RawQuery
+			case proxy.CACHE_IGNORE_QUERY:
+				cacheKey = req.Host + req.URL.Path
+			case proxy.CACHE_QUERY:
+				cacheKey = req.Host + req.URL.RawQuery
+			case proxy.CACHE_CLIENTIP:
+				reqIP = strings.Split(req.RemoteAddr, ":")[0]
+				cacheKey = req.Host + reqIP
+			default:
+			}
 
-		cacheResponse, cacheOk = domains.DomainsCache.Load(cacheKey)
+			cacheResponse, cacheOk = domains.DomainsCache.Load(cacheKey)
 
-		if cacheOk {
-			cachedResp := cacheResponse.(domains.CacheResponse)
+			if cacheOk {
+				cachedResp := cacheResponse.(domains.CacheResponse)
 
-			//Check if cache is expired
-			if cachedResp.Timestamp > int(time.Now().Unix()) {
+				//Check if cache is expired
+				if cachedResp.Timestamp > int(time.Now().Unix()) {
 
-				resp := &http.Response{
-					StatusCode: cachedResp.Status,
-					Header:     cachedResp.Headers,
-					Body:       io.NopCloser(bytes.NewReader(cachedResp.Body)),
+					resp := &http.Response{
+						StatusCode: cachedResp.Status,
+						Header:     cachedResp.Headers,
+						Body:       io.NopCloser(bytes.NewReader(cachedResp.Body)),
+					}
+
+					resp.Header.Set("proxy-cache", "HIT")
+					return resp, nil
+				} else {
+					domains.DomainsCache.Delete(req.Host + req.URL.Path + req.URL.RawQuery)
 				}
-
-				resp.Header.Set("proxy-cache", "HIT")
-				return resp, nil
-			} else {
-				domains.DomainsCache.Delete(req.Host + req.URL.Path + req.URL.RawQuery)
 			}
 		}
 	}
@@ -305,7 +307,7 @@ func (rt *RoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
 
 	resp.Header.Set("proxy-cache", "MISS")
 
-	if (resp.StatusCode < 300 || resp.StatusCode >= 400) && cacheRes != 0 {
+	if (resp.StatusCode < 300 || (resp.StatusCode < 500 && resp.StatusCode >= 400)) && cacheRes != 0 {
 		bodyBytes, bodyErr := io.ReadAll(resp.Body)
 
 		resp.Body = io.NopCloser(bytes.NewReader(bodyBytes))
