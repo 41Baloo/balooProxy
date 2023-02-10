@@ -16,6 +16,7 @@ func init() {
 	gofilter.RegisterField("http.host", gofilter.FT_STRING)
 	gofilter.RegisterField("http.version", gofilter.FT_STRING)
 	gofilter.RegisterField("http.method", gofilter.FT_STRING)
+	gofilter.RegisterField("http.url", gofilter.FT_STRING)
 	gofilter.RegisterField("http.query", gofilter.FT_STRING)
 	gofilter.RegisterField("http.path", gofilter.FT_STRING)
 	gofilter.RegisterField("http.user_agent", gofilter.FT_STRING)

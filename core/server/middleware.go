@@ -136,6 +136,7 @@ func Middleware(writer http.ResponseWriter, request *http.Request) {
 		"http.host":      request.Host,
 		"http.version":   request.Proto,
 		"http.method":    request.Method,
+		"http.url":       request.RequestURI,
 		"http.query":     request.URL.RawQuery,
 		"http.path":      request.URL.Path,
 		"http.UserAgent": strings.ToLower(request.UserAgent()),
