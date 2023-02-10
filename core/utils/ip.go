@@ -3,7 +3,7 @@ package utils
 import (
 	"encoding/json"
 	"goProxy/core/db"
-	"io/ioutil"
+	"io"
 	"net/http"
 
 	"github.com/boltdb/bolt"
@@ -45,7 +45,7 @@ func GetIpInfo(IP string) (country string, asn string) {
 	}
 	defer resp.Body.Close()
 
-	body, err := ioutil.ReadAll(resp.Body)
+	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return "UNK", "UNK"
 	}
@@ -87,7 +87,7 @@ func GetOwnIP() (string, error) {
 	}
 	defer resp.Body.Close()
 
-	ip, err := ioutil.ReadAll(resp.Body)
+	ip, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return "", err
 	}

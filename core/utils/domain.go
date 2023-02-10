@@ -47,4 +47,3 @@ func AddDomain() {
 		panic(err)
 	}
 }
-

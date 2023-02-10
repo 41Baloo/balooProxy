@@ -234,6 +234,12 @@ func commands() {
 				fmt.Println("\033[" + fmt.Sprint(12+proxy.MaxLogLength) + ";1H")
 				fmt.Print("[ " + utils.RedText("Command") + " ]: \033[s")
 				reloadConfig()
+			case "performance":
+				screen.Clear()
+				screen.MoveTopLeft()
+				proxy.PerformanceMode = true
+				fmt.Println("\033[" + fmt.Sprint(12+proxy.MaxLogLength) + ";1H")
+				fmt.Print("[ " + utils.RedText("Command") + " ]: \033[s")
 			default:
 				screen.Clear()
 				screen.MoveTopLeft()

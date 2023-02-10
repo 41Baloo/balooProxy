@@ -19,6 +19,8 @@ var (
 	MaxHeaderSize int
 	MaxBodySize   int
 
+	PerformanceMode = false
+
 	//Path + Query + Method
 	CACHE_DEFAULT = 1
 	//Path + Query

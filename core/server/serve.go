@@ -303,7 +303,7 @@ func (rt *RoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
 
 		defer resp.Body.Close()
 		errBody, bodyErr := io.ReadAll(resp.Body)
-		if bodyErr == nil {
+		if bodyErr == nil && len(errBody) != 0 {
 			errPage =
 				`
 				<!DOCTYPE html>
