@@ -238,6 +238,7 @@ func (rt *RoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
 
 	//Connection was successfull, got bad response tho
 	if resp.StatusCode >= 500 {
+
 		errPage := `
 			<!DOCTYPE html>
 			<html>
@@ -299,6 +300,78 @@ func (rt *RoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
 			</body>
 			</html>
 		`
+
+		defer resp.Body.Close()
+		errBody, bodyErr := io.ReadAll(resp.Body)
+		if bodyErr == nil {
+			errPage =
+				`
+				<!DOCTYPE html>
+				<html>
+					<head>
+						<title>Error: ` + resp.Status + `</title>
+						<style>
+							body {
+							font-family: 'Helvetica Neue', sans-serif;
+							color: #333;
+							margin: 0;
+							padding: 0;
+							}
+							.container {
+							display: flex;
+							align-items: center;
+							justify-content: center;
+							height: 100vh;
+							background: #fafafa;
+							}
+							.error-box {
+							width: 600px;
+							padding: 20px;
+							background: #fff;
+							border-radius: 5px;
+							box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+							}
+							.error-box h1 {
+							font-size: 36px;
+							margin-bottom: 20px;
+							}
+							.error-box p {
+							font-size: 16px;
+							line-height: 1.5;
+							margin-bottom: 20px;
+							}
+							.error-box p.description {
+							font-style: italic;
+							color: #666;
+							}
+							.error-box a {
+							display: inline-block;
+							padding: 10px 20px;
+							background: #00b8d4;
+							color: #fff;
+							border-radius: 5px;
+							text-decoration: none;
+							font-size: 16px;
+							}
+						</style>
+					</head>
+					<body>
+						<div class="container">
+							<div class="error-box">
+							<h1>Error: 502 Bad Gateway</h1>
+							<p>Sorry, the backend returned this error.</p>
+							<iframe width="100%" height="25%" style="border:1px ridge lightgrey; border-radius: 5px;"
+							srcdoc="
+								` + string(errBody) + `">
+							</iframe>
+							<a onclick="location.reload()">Reload page</a>
+							</div>
+						</div>
+					</body>
+				</html>
+				`
+		}
+
 		return &http.Response{
 			StatusCode: http.StatusOK,
 			Body:       io.NopCloser(strings.NewReader(errPage)),
