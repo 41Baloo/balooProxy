@@ -10,6 +10,7 @@ import (
 	"goProxy/core/proxy"
 	"goProxy/core/utils"
 	"io"
+	"io/ioutil"
 	"net"
 	"net/http"
 	"strings"
@@ -237,7 +238,7 @@ func (rt *RoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
 	}
 
 	//Connection was successfull, got bad response tho
-	if resp.StatusCode >= 500 {
+	if resp.StatusCode >= 500 && resp.StatusCode < 600 {
 
 		errPage := `
 			<!DOCTYPE html>
@@ -301,9 +302,8 @@ func (rt *RoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
 			</html>
 		`
 
-		defer resp.Body.Close()
-		errBody, bodyErr := io.ReadAll(resp.Body)
-		if bodyErr == nil && len(errBody) != 0 {
+		errBody, errErr := ioutil.ReadAll(resp.Body)
+		if errErr == nil && len(errBody) != 0 {
 			errPage =
 				`
 				<!DOCTYPE html>
@@ -358,7 +358,7 @@ func (rt *RoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
 					<body>
 						<div class="container">
 							<div class="error-box">
-							<h1>Error: 502 Bad Gateway</h1>
+							<h1>Error: ` + resp.Status + `</h1>
 							<p>Sorry, the backend returned this error.</p>
 							<iframe width="100%" height="25%" style="border:1px ridge lightgrey; border-radius: 5px;"
 							srcdoc="
@@ -371,6 +371,7 @@ func (rt *RoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
 				</html>
 				`
 		}
+		resp.Body.Close()
 
 		return &http.Response{
 			StatusCode: http.StatusOK,

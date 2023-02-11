@@ -525,6 +525,9 @@ func Middleware(writer http.ResponseWriter, request *http.Request) {
 		return
 	}
 
+	//Allow backend to get real ip
+	request.Header.Add("proxy-real-ip", ip)
+
 	domains.DomainsMap.Store(domainName, domain)
 
 	domain.DomainProxy.ServeHTTP(writer, request)
