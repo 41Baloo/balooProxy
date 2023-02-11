@@ -21,6 +21,9 @@ func SendWebhook(domain domains.DomainSettings, notificationType int) {
 	switch notificationType {
 	case 0:
 		description := strings.ReplaceAll(domain.DomainWebhooks.AttackStartMsg, "{{domain.name}}", domain.Name)
+		description = strings.ReplaceAll(description, "{{attack.start}}", domain.RequestLogger[0].Time.Format("15:04:05"))
+		description = strings.ReplaceAll(description, "{{attack.end}}", domain.RequestLogger[len(domain.RequestLogger)-1].Time.Format("15:04:05"))
+
 		webhookContent = Webhook{
 			Content:  "",
 			Username: domain.DomainWebhooks.Name,
@@ -46,6 +49,8 @@ func SendWebhook(domain domains.DomainSettings, notificationType int) {
 	case 1:
 
 		description := strings.ReplaceAll(domain.DomainWebhooks.AttackStopMsg, "{{domain.name}}", domain.Name)
+		description = strings.ReplaceAll(description, "{{attack.start}}", domain.RequestLogger[0].Time.Format("15:04:05"))
+		description = strings.ReplaceAll(description, "{{attack.end}}", domain.RequestLogger[len(domain.RequestLogger)-1].Time.Format("15:04:05"))
 
 		allowedData := "["
 		totalData := "["
