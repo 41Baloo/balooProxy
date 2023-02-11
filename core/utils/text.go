@@ -22,7 +22,7 @@ func AddLogs(entry string, domain domains.DomainSettings) domains.DomainSettings
 		domain.LastLogs = domain.LastLogs[1:]
 		domain.LastLogs = append(domain.LastLogs, entry)
 
-		if !proxy.PerformanceMode {
+		if proxy.RealTimeLogs {
 			for i, log := range domain.LastLogs {
 				if len(log)+4 > proxy.TWidth {
 					fmt.Print("\033[" + fmt.Sprint(11+i) + ";1H\033[K[" + RedText("!") + "] " + log[:len(log)-(len(log)+4-proxy.TWidth)] + " ...\033[0m\n")
@@ -36,7 +36,7 @@ func AddLogs(entry string, domain domains.DomainSettings) domains.DomainSettings
 		return domain
 	}
 	domain.LastLogs = append(domain.LastLogs, entry)
-	if domain.Name == proxy.WatchedDomain && !proxy.PerformanceMode {
+	if domain.Name == proxy.WatchedDomain && proxy.RealTimeLogs {
 		if len(entry)+4 > proxy.TWidth {
 			fmt.Print("\033[" + fmt.Sprint((10 + len(domain.LastLogs))) + ";1H\033[K[" + RedText("-") + "] " + entry[:len(entry)-(len(entry)+4-proxy.TWidth)] + " ...\033[0m\n")
 		} else {

@@ -59,7 +59,8 @@ func Monitor() {
 		fmt.Print("\033[1;1H")
 
 		domains.DomainsMap.Range(func(_, dInterface interface{}) bool {
-			return checkAttack(dInterface)
+			go checkAttack(dInterface)
+			return false
 		})
 
 		printStats()
@@ -68,7 +69,7 @@ func Monitor() {
 	}
 }
 
-func checkAttack(dInterface interface{}) bool {
+func checkAttack(dInterface interface{}) {
 	dValue := dInterface.(domains.DomainSettings)
 
 	dValue.RequestsPerSecond = dValue.TotalRequests - dValue.PrevRequests
@@ -116,7 +117,6 @@ func checkAttack(dInterface interface{}) bool {
 	}
 
 	domains.DomainsMap.Store(dValue.Name, dValue)
-	return true
 }
 
 func printStats() {
@@ -234,10 +234,16 @@ func commands() {
 				fmt.Println("\033[" + fmt.Sprint(12+proxy.MaxLogLength) + ";1H")
 				fmt.Print("[ " + utils.RedText("Command") + " ]: \033[s")
 				reloadConfig()
-			case "performance":
+			case "rtlogs":
 				screen.Clear()
 				screen.MoveTopLeft()
-				proxy.PerformanceMode = true
+				if proxy.RealTimeLogs {
+					proxy.RealTimeLogs = false
+					fmt.Println("[ " + utils.RedText("Turning Real Time Logs Off") + " ] ...")
+				} else {
+					proxy.RealTimeLogs = true
+					fmt.Println("[ " + utils.RedText("Turning Real Time Logs On") + " ] ...")
+				}
 				fmt.Println("\033[" + fmt.Sprint(12+proxy.MaxLogLength) + ";1H")
 				fmt.Print("[ " + utils.RedText("Command") + " ]: \033[s")
 			default:

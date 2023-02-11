@@ -19,7 +19,7 @@ var (
 	MaxHeaderSize int
 	MaxBodySize   int
 
-	PerformanceMode = false
+	RealTimeLogs = false
 
 	//Path + Query + Method
 	CACHE_DEFAULT = 1
