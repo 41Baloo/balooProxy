@@ -3,6 +3,7 @@ package config
 import (
 	"crypto/tls"
 	"encoding/json"
+	"fmt"
 	"goProxy/core/db"
 	"goProxy/core/domains"
 	"goProxy/core/firewall"
@@ -22,6 +23,8 @@ func Load() {
 	if err != nil {
 		if os.IsNotExist(err) {
 			Generate()
+			fmt.Println("[ " + utils.RedText("You can now register your admin account on https://"+domains.Config.Domains[0].Name+"/_bProxy/"+domains.Config.Proxy.AdminSecret+"/login") + " (Press enter before continuing) ]")
+			utils.ReadTerminal()
 		} else {
 			panic(err)
 		}
