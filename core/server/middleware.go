@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/base64"
 	"fmt"
+	"goProxy/core/dashboard"
 	"goProxy/core/domains"
 	"goProxy/core/firewall"
 	"goProxy/core/utils"
@@ -515,6 +516,21 @@ func Middleware(writer http.ResponseWriter, request *http.Request) {
 	case "/_bProxy/verified":
 		writer.Header().Set("Content-Type", "text/plain")
 		fmt.Fprintf(writer, "verified")
+		domains.DomainsMap.Store(domainName, domain)
+		return
+	case "/_bProxy/" + domains.Config.Proxy.AdminSecret + "/login":
+		writer.Header().Set("Content-Type", "text/html")
+		dashboard.PageLogin(writer, request)
+		domains.DomainsMap.Store(domainName, domain)
+		return
+	case "/_bProxy/" + domains.Config.Proxy.AdminSecret + "/create":
+		if request.Method == "POST" {
+			dashboard.PageCreate(writer, request)
+			domains.DomainsMap.Store(domainName, domain)
+			return
+		}
+	case "/_bProxy/" + domains.Config.Proxy.AdminSecret + "/dash":
+		dashboard.PageDashboard(writer, request)
 		domains.DomainsMap.Store(domainName, domain)
 		return
 	//Do not remove or modify this. It is required by the license

@@ -1,0 +1,173 @@
+<html>
+
+<head>
+	<style>
+	body {
+		background-color: #f5f5f5;
+		font-family: Arial, sans-serif;
+	}
+	
+	.center {
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		height: 100vh;
+	}
+	
+	.box {
+		background-color: white;
+		border: 1px solid #ddd;
+		border-radius: 4px;
+		padding: 20px;
+		width: 500px;
+	}
+	
+	img {
+		display: block;
+		margin: 0 auto;
+		max-width: 100%;
+	}
+	
+	input[type="text"] {
+		width: 100%;
+		padding: 12px 20px;
+		margin: 8px 0;
+		box-sizing: border-box;
+		border: 2px solid #ccc;
+		border-radius: 4px;
+	}
+
+    input[type="password"] {
+		width: 100%;
+		padding: 12px 20px;
+		margin: 8px 0;
+		box-sizing: border-box;
+		border: 2px solid #ccc;
+		border-radius: 4px;
+	}
+	
+	button {
+		width: 100%;
+		background-color: #4caf50;
+		color: white;
+		padding: 14px 20px;
+		margin: 8px 0;
+		border: none;
+		border-radius: 4px;
+		cursor: pointer;
+	}
+	
+	button:hover {
+		background-color: #45a049;
+	}
+	/* Add styles for the animation */
+	
+	.box {
+		background-color: white;
+		border: 1px solid #ddd;
+		border-radius: 4px;
+		padding: 20px;
+		width: 500px;
+		/* Add a transition effect for the height */
+		transition: height 0.1s;
+		position: block;
+	}
+	/* Add a transition effect for the opacity */
+	
+	.box * {
+		transition: opacity 0.1s;
+	}
+	/* Add a success message and style it */
+	
+	.success {
+		background-color: #dff0d8;
+		border: 1px solid #d6e9c6;
+		border-radius: 4px;
+		color: #3c763d;
+		padding: 20px;
+	}
+
+    .failure {
+        background-color: #f0d8d8;
+		border: 1px solid #e9c6c6;
+		border-radius: 4px;
+		color: #763c3c;
+		padding: 20px;
+    }
+	/* Add styles for the collapsible help text */
+	
+	.collapsible {
+		background-color: #f5f5f5;
+		color: #444;
+		cursor: pointer;
+		padding: 18px;
+		width: 100%;
+		border: none;
+		text-align: left;
+		outline: none;
+		font-size: 15px;
+	}
+	
+	.collapsible:after {
+		content: '\002B';
+		color: #777;
+		font-weight: bold;
+		float: right;
+		margin-left: 5px;
+	}
+	
+	.collapsible.active:after {
+		content: "\2212";
+	}
+	
+	.collapsible:hover {
+		background-color: #e5e5e5;
+	}
+	
+	.collapsible-content {
+		padding: 0 18px;
+		max-height: 0;
+		overflow: hidden;
+		transition: max-height 0.2s ease-out;
+		background-color: #f5f5f5;
+	}
+	</style>
+</head>
+
+<body>
+	<div class="center" id="center">
+		<div class="box" id="box">
+			<h1>balooProxy Dashboard</h1>
+			<form onsubmit="return onClick(event)">
+				<input id="username" type="text" placeholder="Username" required>
+                <input id="password" type="password" placeholder="Password" required>
+				<button type="submit">Login</button>
+			</form>
+			<div class="success" id="successMessage" style="display: none;">Success! Redirecting ...</div>
+			<div class="failure" id="failMessage" style="display: none;">Failed! Please try again.</div>
+			<button class="collapsible">Forgot Username/Password?</button>
+			<div class="collapsible-content">
+				<p> If you forgot your username or password, you can delete/modify the data found in proxyData.db </p>
+			</div>
+		</div>
+	</div>
+</body>
+<script>
+function onClick(event) {
+	// Prevent the form from being submitted
+	event.preventDefault();
+}
+var coll = document.getElementsByClassName("collapsible");
+var i;
+for(i = 0; i < coll.length; i++) {
+	coll[i].addEventListener("click", function() {
+		this.classList.toggle("active");
+		var content = this.nextElementSibling;
+		if(content.style.maxHeight) {
+			content.style.maxHeight = null;
+		} else {
+			content.style.maxHeight = content.scrollHeight + "px";
+		}
+	});
+}
+</script>

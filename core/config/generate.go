@@ -54,6 +54,8 @@ func Generate() {
 	fmt.Println("")
 	AddDomain()
 
+	fmt.Println("[ " + utils.RedText("You can now register your admin account on "+domains.Domains[0]+"/_bProxy/"+domains.Config.Proxy.AdminSecret+"/login") + " ]")
+
 }
 
 func AddDomain() {
