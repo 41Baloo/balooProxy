@@ -13,8 +13,8 @@ import (
 
 func Generate() {
 
-	fmt.Println("[" + utils.RedText("No Configuration File Found") + "]")
-	fmt.Println("[" + utils.RedText("Configuring Proxy Now") + "]")
+	fmt.Println("[ " + utils.RedText("No Configuration File Found") + " ]")
+	fmt.Println("[ " + utils.RedText("Configuring Proxy Now") + " ]")
 	fmt.Println("")
 
 	gConfig := domains.Configuration{
