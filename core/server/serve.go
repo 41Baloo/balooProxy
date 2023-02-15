@@ -414,6 +414,7 @@ func (rt *RoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
 		}
 
 		domains.DomainsCache.Store(cacheKey, domains.CacheResponse{
+			Domain:    resp.Request.Host,
 			Timestamp: int(time.Now().Unix()) + 3600, //Cache for an hour
 			Status:    resp.StatusCode,
 			Headers:   resp.Header,

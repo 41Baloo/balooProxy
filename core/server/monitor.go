@@ -38,7 +38,10 @@ func Monitor() {
 	go commands()
 
 	//Responsible for clearing outdated cache and data
-	go clearCache()
+	go clearProxyCache()
+
+	//Responsible for clearing outdated websitecache
+	go clearOutdatedCache()
 
 	PrintMutex.Lock()
 	fmt.Println("\033[" + fmt.Sprint(11+proxy.MaxLogLength) + ";1H")
@@ -246,6 +249,13 @@ func commands() {
 				}
 				fmt.Println("\033[" + fmt.Sprint(12+proxy.MaxLogLength) + ";1H")
 				fmt.Print("[ " + utils.RedText("Command") + " ]: \033[s")
+			case "delcache":
+				screen.Clear()
+				screen.MoveTopLeft()
+				fmt.Println("[ " + utils.RedText("Clearing Cache For "+proxy.WatchedDomain) + " ] ...")
+				clearCache()
+				fmt.Println("\033[" + fmt.Sprint(12+proxy.MaxLogLength) + ";1H")
+				fmt.Print("[ " + utils.RedText("Command") + " ]: \033[s")
 			default:
 				screen.Clear()
 				screen.MoveTopLeft()
@@ -380,7 +390,7 @@ func reloadConfig() {
 	proxy.WatchedDomain = domains.Domains[0]
 }
 
-func clearCache() {
+func clearProxyCache() {
 	for {
 		//Clear logs and maps every 2 minutes. (I know this is a lazy way to do it, tho for now it seems to be the most efficient and fast way to go about it)
 		firewall.Mutex.Lock()
@@ -404,5 +414,35 @@ func clearCache() {
 		}
 		firewall.Mutex.Unlock()
 		time.Sleep(2 * time.Minute)
+	}
+}
+
+func clearCache() {
+	domains.DomainsCache.Range(func(key, value any) bool {
+		cacheQuery, ok := domains.DomainsCache.Load(key)
+		if ok {
+			cacheResp := cacheQuery.(domains.CacheResponse)
+			if cacheResp.Domain == proxy.WatchedDomain {
+				domains.DomainsCache.Delete(key)
+			}
+		}
+		return true
+	})
+}
+
+func clearOutdatedCache() {
+	for {
+		domains.DomainsCache.Range(func(key, value any) bool {
+			cacheQuery, ok := domains.DomainsCache.Load(key)
+			if !ok {
+				domains.DomainsCache.Delete(key)
+			}
+			cacheResp := cacheQuery.(domains.CacheResponse)
+			if cacheResp.Timestamp < int(time.Now().Unix()) {
+				domains.DomainsCache.Delete(key)
+			}
+			return true
+		})
+		time.Sleep(5 * time.Hour)
 	}
 }

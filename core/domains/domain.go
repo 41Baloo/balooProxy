@@ -111,6 +111,7 @@ type RequestLog struct {
 }
 
 type CacheResponse struct {
+	Domain    string
 	Timestamp int
 	Status    int
 	Headers   http.Header

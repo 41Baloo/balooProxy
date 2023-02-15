@@ -541,8 +541,10 @@ func Middleware(writer http.ResponseWriter, request *http.Request) {
 		return
 	}
 
-	//Allow backend to get real ip
+	//Allow backend to read client information
 	request.Header.Add("proxy-real-ip", ip)
+	request.Header.Add("proxy-tls-fp", tlsFp)
+	request.Header.Add("proxy-tls-name", browser+botFp)
 
 	domains.DomainsMap.Store(domainName, domain)
 
