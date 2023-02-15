@@ -419,12 +419,9 @@ func clearProxyCache() {
 
 func clearCache() {
 	domains.DomainsCache.Range(func(key, value any) bool {
-		cacheQuery, ok := domains.DomainsCache.Load(key)
-		if ok {
-			cacheResp := cacheQuery.(domains.CacheResponse)
-			if cacheResp.Domain == proxy.WatchedDomain {
-				domains.DomainsCache.Delete(key)
-			}
+		cacheResp := value.(domains.CacheResponse)
+		if cacheResp.Domain == proxy.WatchedDomain {
+			domains.DomainsCache.Delete(key)
 		}
 		return true
 	})
@@ -432,13 +429,10 @@ func clearCache() {
 
 func clearOutdatedCache() {
 	for {
+		currTime := int(time.Now().Unix())
 		domains.DomainsCache.Range(func(key, value any) bool {
-			cacheQuery, ok := domains.DomainsCache.Load(key)
-			if !ok {
-				domains.DomainsCache.Delete(key)
-			}
-			cacheResp := cacheQuery.(domains.CacheResponse)
-			if cacheResp.Timestamp < int(time.Now().Unix()) {
+			cacheResp := value.(domains.CacheResponse)
+			if cacheResp.Timestamp < currTime {
 				domains.DomainsCache.Delete(key)
 			}
 			return true
