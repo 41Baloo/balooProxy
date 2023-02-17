@@ -116,9 +116,10 @@ type Rule struct {
 }
 
 type RequestLog struct {
-	Time    time.Time
-	Allowed int
-	Total   int
+	Time     time.Time
+	Allowed  int
+	Total    int
+	CpuUsage string
 }
 
 type CacheResponse struct {

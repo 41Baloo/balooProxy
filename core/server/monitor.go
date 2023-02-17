@@ -98,6 +98,7 @@ func checkAttack(dInterface interface{}) {
 				Time:    time.Now(),
 				Allowed: dValue.RequestsBypassedPerSecond,
 				Total:   dValue.RequestsPerSecond,
+				CpuUsage:     proxy.CpuUsage,
 			})
 		}
 
@@ -110,6 +111,7 @@ func checkAttack(dInterface interface{}) {
 				Time:    time.Now(),
 				Allowed: dValue.RequestsBypassedPerSecond,
 				Total:   dValue.RequestsPerSecond,
+				CpuUsage:     proxy.CpuUsage,
 			})
 			go utils.SendWebhook(dValue, int(0))
 		} else if dValue.Stage == 2 && dValue.RequestsBypassedPerSecond > dValue.BypassStage2 {

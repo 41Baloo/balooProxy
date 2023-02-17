@@ -20,10 +20,10 @@ import (
 )
 
 func Serve() {
-	idleTimeout := time.Duration(domains.Config.Proxy.Timeout.Idle).Abs() * time.Microsecond
-	readTimeout := time.Duration(domains.Config.Proxy.Timeout.Read).Abs() * time.Microsecond
-	writeTimeout := time.Duration(domains.Config.Proxy.Timeout.Write).Abs() * time.Microsecond
-	readHeaderTimeout := time.Duration(domains.Config.Proxy.Timeout.ReadHeader).Abs() * time.Microsecond
+	idleTimeout := time.Duration(domains.Config.Proxy.Timeout.Idle).Abs() * time.Second
+	readTimeout := time.Duration(domains.Config.Proxy.Timeout.Read).Abs() * time.Second
+	writeTimeout := time.Duration(domains.Config.Proxy.Timeout.Write).Abs() * time.Second
+	readHeaderTimeout := time.Duration(domains.Config.Proxy.Timeout.ReadHeader).Abs() * time.Second
 
 	if domains.Config.Proxy.Cloudflare {
 		service := &http.Server{
@@ -156,7 +156,7 @@ func (rt *RoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
 	transport := &http.Transport{
 		DialContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
 			return (&net.Dialer{
-				Timeout: time.Duration(domains.Config.Proxy.Timeout.Read).Abs() * time.Microsecond,
+				Timeout: time.Duration(domains.Config.Proxy.Timeout.Read).Abs() * time.Second,
 			}).DialContext(ctx, network, addr)
 		},
 		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},

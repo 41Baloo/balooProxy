@@ -12,6 +12,7 @@ require (
 
 require (
 	github.com/go-ole/go-ole v1.2.6 // indirect
+	github.com/henomis/quickchart-go v1.0.0
 	github.com/inancgumus/screen v0.0.0-20190314163918-06e984b86ed3 // indirect
 	github.com/shirou/gopsutil v3.21.11+incompatible // indirect
 	github.com/tklauser/go-sysconf v0.3.11 // indirect
