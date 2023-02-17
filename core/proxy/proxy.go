@@ -22,6 +22,11 @@ var (
 	CaptchaSecret string
 	CaptchaOTP    string
 
+	IdleTimeout       int
+	ReadTimout        int
+	WriteTimeout      int
+	ReadHeaderTimeout int
+
 	IPRatelimit            int
 	FPRatelimit            int
 	FailChallengeRatelimit int

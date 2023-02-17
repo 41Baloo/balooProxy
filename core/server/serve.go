@@ -20,12 +20,17 @@ import (
 )
 
 func Serve() {
+	idleTimeout := time.Duration(domains.Config.Proxy.Timeout.Idle).Abs() * time.Microsecond
+	readTimeout := time.Duration(domains.Config.Proxy.Timeout.Read).Abs() * time.Microsecond
+	writeTimeout := time.Duration(domains.Config.Proxy.Timeout.Write).Abs() * time.Microsecond
+	readHeaderTimeout := time.Duration(domains.Config.Proxy.Timeout.ReadHeader).Abs() * time.Microsecond
+
 	if domains.Config.Proxy.Cloudflare {
 		service := &http.Server{
-			IdleTimeout:       5 * time.Second,
-			ReadTimeout:       5 * time.Second,
-			WriteTimeout:      7 * time.Second,
-			ReadHeaderTimeout: 5 * time.Second,
+			IdleTimeout:       idleTimeout,
+			ReadTimeout:       readTimeout,
+			WriteTimeout:      writeTimeout,
+			ReadHeaderTimeout: readHeaderTimeout,
 			Addr:              ":80",
 		}
 
@@ -37,18 +42,18 @@ func Serve() {
 		}
 	} else {
 		service := &http.Server{
-			IdleTimeout:       5 * time.Second,
-			ReadTimeout:       5 * time.Second,
-			WriteTimeout:      7 * time.Second,
-			ReadHeaderTimeout: 5 * time.Second,
+			IdleTimeout:       idleTimeout,
+			ReadTimeout:       readTimeout,
+			WriteTimeout:      writeTimeout,
+			ReadHeaderTimeout: readHeaderTimeout,
 			ConnState:         firewall.OnStateChange,
 			Addr:              ":80",
 		}
 		serviceH := &http.Server{
-			IdleTimeout:       5 * time.Second,
-			ReadTimeout:       5 * time.Second,
-			WriteTimeout:      7 * time.Second,
-			ReadHeaderTimeout: 5 * time.Second,
+			IdleTimeout:       idleTimeout,
+			ReadTimeout:       readTimeout,
+			WriteTimeout:      writeTimeout,
+			ReadHeaderTimeout: readHeaderTimeout,
 			ConnState:         firewall.OnStateChange,
 			Addr:              ":443",
 			TLSConfig: &tls.Config{
@@ -147,11 +152,11 @@ func (rt *RoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
 		}
 	}
 
-	//Define 5 second timeout
+	//Use Proxy Read Timeout
 	transport := &http.Transport{
 		DialContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
 			return (&net.Dialer{
-				Timeout: 5 * time.Second,
+				Timeout: time.Duration(domains.Config.Proxy.Timeout.Read).Abs() * time.Microsecond,
 			}).DialContext(ctx, network, addr)
 		},
 		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},

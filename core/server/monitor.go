@@ -300,6 +300,10 @@ func reloadConfig() {
 	proxy.JSSecret = domains.Config.Proxy.Secrets["javascript"]
 	proxy.CaptchaSecret = domains.Config.Proxy.Secrets["captcha"]
 
+	proxy.IdleTimeout = domains.Config.Proxy.Timeout.Idle
+	proxy.ReadTimout = domains.Config.Proxy.Timeout.Read
+	proxy.WriteTimeout = domains.Config.Proxy.Timeout.Write
+	proxy.ReadHeaderTimeout = domains.Config.Proxy.Timeout.ReadHeader
 	proxy.IPRatelimit = domains.Config.Proxy.Ratelimits["requests"]
 	proxy.FPRatelimit = domains.Config.Proxy.Ratelimits["unknownFingerprint"]
 	proxy.FailChallengeRatelimit = domains.Config.Proxy.Ratelimits["challengeFailures"]

@@ -84,9 +84,17 @@ type Proxy struct {
 	AdminSecret   string            `json:"adminsecret"`
 	APISecret     string            `json:"apisecret"`
 	Secrets       map[string]string `json:"secrets"`
+	Timeout       TimeoutSettings   `json:"timeout"`
 	Ratelimits    map[string]int    `json:"ratelimits"`
 	MaxHeaderSize int               `json:"maxHeaderSize"`
 	MaxBodySize   int               `json:"maxBodySize"`
+}
+
+type TimeoutSettings struct {
+	Idle       int `json:"idle"`
+	Read       int `json:"read"`
+	Write      int `json:"write"`
+	ReadHeader int `json:"read_header"`
 }
 
 type WebhookSettings struct {
