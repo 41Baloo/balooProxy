@@ -6,6 +6,7 @@ import (
 	"github.com/boltdb/bolt"
 )
 
+// Connect and setup database that caches ipinformation
 func Connect() {
 	var err error
 	Instance.DB, err = bolt.Open("proxyCache.db", 0600, nil)

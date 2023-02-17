@@ -22,7 +22,7 @@ func Generate() {
 			Cloudflare:   utils.AskBool("Use This Proxy With Cloudflare? (y/N)", false),
 			MaxLogLength: utils.AskInt("How Long Should The Access Logs Be?", 10),
 			AdminSecret:  utils.RandomString(25),
-			APISecret: utils.RandomString(30),
+			APISecret:    utils.RandomString(30),
 			Secrets: map[string]string{
 				"cookie":     utils.RandomString(20),
 				"javascript": utils.RandomString(20),
@@ -67,7 +67,7 @@ func AddDomain() {
 		Certificate: utils.AskString("What Is The Path To The SSL Certificate For Your Domain? (Leave Empty If You Are Using The Proxy Behind Cloudflare)", ""),
 		Key:         utils.AskString("What Is The Path To The SSL Key For Your Domain? (Leave Empty If You Are Using The Proxy Behind Cloudflare)", ""),
 		Webhook: domains.WebhookSettings{
-			Url:            utils.AskString("What Is The Url For Your Discord Webhook? (Leave Empty If You Do Not Want One)", ""),
+			URL:            utils.AskString("What Is The Url For Your Discord Webhook? (Leave Empty If You Do Not Want One)", ""),
 			Name:           utils.AskString("What Is The Name For Your Discord Webhook? (Leave Empty If You Do Not Want One)", ""),
 			Avatar:         utils.AskString("What Is The Url For Your Discord Webhook Avatar? (Leave Empty If You Do Not Want One)", ""),
 			AttackStartMsg: utils.AskString("What Is The Message Your Webhook Should Send When Your Website Is Under Attack?", ""),

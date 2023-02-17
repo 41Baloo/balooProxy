@@ -7,7 +7,7 @@ import (
 )
 
 var (
-	Instance *Container = new(Container)
+	Instance = new(Container)
 )
 
 type Container struct {

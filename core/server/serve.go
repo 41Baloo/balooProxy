@@ -140,9 +140,9 @@ func (rt *RoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
 
 					resp.Header.Set("proxy-cache", "HIT")
 					return resp, nil
-				} else {
-					domains.DomainsCache.Delete(req.Host + req.URL.Path + req.URL.RawQuery)
 				}
+
+				domains.DomainsCache.Delete(req.Host + req.URL.Path + req.URL.RawQuery)
 			}
 		}
 	}

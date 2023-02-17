@@ -5,14 +5,27 @@ import (
 	"encoding/json"
 	"fmt"
 	"goProxy/core/domains"
+	"goProxy/core/proxy"
 	"io"
 	"net/http"
 	"strings"
 )
 
+func InitPlaceholders(msg string, domain domains.DomainSettings) string {
+	msg = strings.ReplaceAll(msg, "{{domain.name}}", domain.Name)
+	msg = strings.ReplaceAll(msg, "{{attack.start}}", domain.RequestLogger[0].Time.Format("15:04:05"))
+	msg = strings.ReplaceAll(msg, "{{attack.end}}", domain.RequestLogger[len(domain.RequestLogger)-1].Time.Format("15:04:05"))
+	msg = strings.ReplaceAll(msg, "{{proxy.cpu}}", proxy.CpuUsage)
+	msg = strings.ReplaceAll(msg, "{{proxy.ram}}", proxy.RamUsage)
+
+	return msg
+
+	return msg
+}
+
 func SendWebhook(domain domains.DomainSettings, notificationType int) {
 
-	if domain.DomainWebhooks.Url == "" {
+	if domain.DomainWebhooks.URL == "" {
 		return
 	}
 
@@ -20,9 +33,8 @@ func SendWebhook(domain domains.DomainSettings, notificationType int) {
 
 	switch notificationType {
 	case 0:
-		description := strings.ReplaceAll(domain.DomainWebhooks.AttackStartMsg, "{{domain.name}}", domain.Name)
-		description = strings.ReplaceAll(description, "{{attack.start}}", domain.RequestLogger[0].Time.Format("15:04:05"))
-		description = strings.ReplaceAll(description, "{{attack.end}}", domain.RequestLogger[len(domain.RequestLogger)-1].Time.Format("15:04:05"))
+
+		description := InitPlaceholders(domain.DomainWebhooks.AttackStartMsg, domain)
 
 		webhookContent = Webhook{
 			Content:  "",
@@ -48,9 +60,7 @@ func SendWebhook(domain domains.DomainSettings, notificationType int) {
 		}
 	case 1:
 
-		description := strings.ReplaceAll(domain.DomainWebhooks.AttackStopMsg, "{{domain.name}}", domain.Name)
-		description = strings.ReplaceAll(description, "{{attack.start}}", domain.RequestLogger[0].Time.Format("15:04:05"))
-		description = strings.ReplaceAll(description, "{{attack.end}}", domain.RequestLogger[len(domain.RequestLogger)-1].Time.Format("15:04:05"))
+		description := InitPlaceholders(domain.DomainWebhooks.AttackStopMsg, domain)
 
 		allowedData := "["
 		totalData := "["
@@ -133,7 +143,7 @@ func SendWebhook(domain domains.DomainSettings, notificationType int) {
 		return
 	}
 
-	req, err := http.NewRequest("POST", domain.DomainWebhooks.Url, bytes.NewBuffer(webhookPayload))
+	req, err := http.NewRequest("POST", domain.DomainWebhooks.URL, bytes.NewBuffer(webhookPayload))
 	if err != nil {
 		return
 	}

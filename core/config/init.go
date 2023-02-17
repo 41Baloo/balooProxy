@@ -120,7 +120,7 @@ func Load() {
 			DomainProxy:        dProxy,
 			DomainCertificates: cert,
 			DomainWebhooks: domains.WebhookSettings{
-				Url:            domain.Webhook.Url,
+				URL:            domain.Webhook.URL,
 				Name:           domain.Webhook.Name,
 				Avatar:         domain.Webhook.Avatar,
 				AttackStartMsg: domain.Webhook.AttackStartMsg,

@@ -351,7 +351,7 @@ func reloadConfig() {
 
 		var cert tls.Certificate = tls.Certificate{}
 		if !proxy.Cloudflare {
-			var certErr error = nil
+			var certErr error
 			cert, certErr = tls.LoadX509KeyPair(domain.Certificate, domain.Key)
 			if certErr != nil {
 				panic("[ " + utils.RedText("!") + " ] [ " + utils.RedText("Error Loading Certificates: "+certErr.Error()) + " ]")
@@ -374,7 +374,7 @@ func reloadConfig() {
 			DomainProxy:        dProxy,
 			DomainCertificates: cert,
 			DomainWebhooks: domains.WebhookSettings{
-				Url:            domain.Webhook.Url,
+				URL:            domain.Webhook.URL,
 				Name:           domain.Webhook.Name,
 				Avatar:         domain.Webhook.Avatar,
 				AttackStartMsg: domain.Webhook.AttackStartMsg,
@@ -457,6 +457,11 @@ func clearOutdatedCache() {
 }
 
 func generateOTPSecrets() {
+
+	//You can change this to use hours as the hash key, to make it even more secure against offline bruteforcing, however, if you use multiple servers make sure they all start within the same timeframe, e.g.
+	//Server1 starts at 23:59:50, Server2 starts at 00:00:01. In this case the keys are mismatched and clients would have to solve challenges again whenever they access a different server than before.
+	//To avoid this and help you, this function runs every minute, reducing this offset to only 1 minute maximum of mismatch per day
+
 	for {
 		currTime := time.Now()
 		currDate := currTime.Format("2006-01-02")

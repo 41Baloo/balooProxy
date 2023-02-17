@@ -90,7 +90,7 @@ type Proxy struct {
 }
 
 type WebhookSettings struct {
-	Url            string `json:"url"`
+	URL            string `json:"url"`
 	Name           string `json:"name"`
 	Avatar         string `json:"avatar"`
 	AttackStartMsg string `json:"attack_start_msg"`

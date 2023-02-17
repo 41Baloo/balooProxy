@@ -9,7 +9,7 @@ import (
 	"github.com/boltdb/bolt"
 )
 
-type IpInfo struct {
+type IPInfo struct {
 	Country struct {
 		Code string `json:"alpha2_code"`
 	} `json:"country"`
@@ -50,7 +50,7 @@ func GetIpInfo(IP string) (country string, asn string) {
 		return "UNK", "UNK"
 	}
 
-	var data IpInfo
+	var data IPInfo
 	err = json.Unmarshal(body, &data)
 	if err != nil {
 		return "UNK", "UNK"

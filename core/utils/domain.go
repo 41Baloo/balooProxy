@@ -19,7 +19,7 @@ func AddDomain() {
 		Certificate: AskString("What Is The Path To The SSL Certificate For Your Domain? (Leave Empty If You Are Using The Proxy Behind Cloudflare)", ""),
 		Key:         AskString("What Is The Path To The SSL Key For Your Domain? (Leave Empty If You Are Using The Proxy Behind Cloudflare)", ""),
 		Webhook: domains.WebhookSettings{
-			Url:            AskString("What Is The Url For Your Discord Webhook? (Leave Empty If You Do Not Want One)", ""),
+			URL:            AskString("What Is The Url For Your Discord Webhook? (Leave Empty If You Do Not Want One)", ""),
 			Name:           AskString("What Is The Name For Your Discord Webhook? (Leave Empty If You Do Not Want One)", ""),
 			Avatar:         AskString("What Is The Url For Your Discord Webhook Avatar? (Leave Empty If You Do Not Want One)", ""),
 			AttackStartMsg: AskString("What Is The Message Your Webhook Should Send When Your Website Is Under Attack?", ""),
