@@ -98,6 +98,7 @@ func checkAttack(dInterface interface{}) {
 				Time:    time.Now(),
 				Allowed: dValue.RequestsBypassedPerSecond,
 				Total:   dValue.RequestsPerSecond,
+				CpuUsage:     proxy.CpuUsage,
 			})
 		}
 
@@ -110,6 +111,7 @@ func checkAttack(dInterface interface{}) {
 				Time:    time.Now(),
 				Allowed: dValue.RequestsBypassedPerSecond,
 				Total:   dValue.RequestsPerSecond,
+				CpuUsage:     proxy.CpuUsage,
 			})
 			go utils.SendWebhook(dValue, int(0))
 		} else if dValue.Stage == 2 && dValue.RequestsBypassedPerSecond > dValue.BypassStage2 {
@@ -299,6 +301,18 @@ func reloadConfig() {
 	proxy.CookieSecret = domains.Config.Proxy.Secrets["cookie"]
 	proxy.JSSecret = domains.Config.Proxy.Secrets["javascript"]
 	proxy.CaptchaSecret = domains.Config.Proxy.Secrets["captcha"]
+
+	// Check if the Proxy Timeout Config has been set otherwise use default values
+	proxyTimeout := domains.Config.Proxy.Timeout
+	if proxyTimeout.Idle != 0 &&
+		proxyTimeout.Read != 0 &&
+		proxyTimeout.Write != 0 &&
+		proxyTimeout.ReadHeader != 0 {
+		proxy.IdleTimeout = domains.Config.Proxy.Timeout.Idle
+		proxy.ReadTimout = domains.Config.Proxy.Timeout.Read
+		proxy.WriteTimeout = domains.Config.Proxy.Timeout.Write
+		proxy.ReadHeaderTimeout = domains.Config.Proxy.Timeout.ReadHeader
+	}
 
 	proxy.IPRatelimit = domains.Config.Proxy.Ratelimits["requests"]
 	proxy.FPRatelimit = domains.Config.Proxy.Ratelimits["unknownFingerprint"]
