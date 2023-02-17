@@ -51,7 +51,9 @@ var (
 
 func Fingerprint(clientHello *tls.ClientHelloInfo) (*tls.Config, error) {
 
-	ip := strings.Split(clientHello.Conn.RemoteAddr().String(), ":")[0]
+	remoteAddr := clientHello.Conn.RemoteAddr().String()
+
+	ip := strings.Split(remoteAddr, ":")[0]
 
 	Mutex.Lock()
 	ipCount := AccessIps[ip]
@@ -67,19 +69,19 @@ func Fingerprint(clientHello *tls.ClientHelloInfo) (*tls.Config, error) {
 
 	//Loop over clientHello parameters and ignore first elements of arrays since they may be randomised by certain browsers
 	for _, suite := range clientHello.CipherSuites[1:] {
-		fingerprint += fmt.Sprintf("0x%x", suite) + ","
+		fingerprint += fmt.Sprintf("0x%x,", suite)
 	}
 
 	for _, curve := range clientHello.SupportedCurves[1:] {
-		fingerprint += fmt.Sprintf("0x%x", curve) + ","
+		fingerprint += fmt.Sprintf("0x%x,", curve)
 	}
 	for _, point := range clientHello.SupportedPoints[:1] {
-		fingerprint += fmt.Sprintf("0x%x", point) + ","
+		fingerprint += fmt.Sprintf("0x%x,", point)
 	}
 
 	//Remember what connection has what fingerprint for later use
 	Mutex.Lock()
-	Connections[fmt.Sprint(clientHello.Conn.RemoteAddr())] = fingerprint
+	Connections[remoteAddr] = fingerprint
 	Mutex.Unlock()
 
 	return nil, nil

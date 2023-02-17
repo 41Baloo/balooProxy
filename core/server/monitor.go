@@ -8,6 +8,7 @@ import (
 	"net/http/httputil"
 	"net/url"
 	"os"
+	"runtime"
 	"strconv"
 	"strings"
 	"sync"
@@ -42,6 +43,9 @@ func Monitor() {
 
 	//Responsible for clearing outdated websitecache
 	go clearOutdatedCache()
+
+	//Responsible for generating non-bruteforable secrets
+	go generateOTPSecrets()
 
 	PrintMutex.Lock()
 	fmt.Println("\033[" + fmt.Sprint(11+proxy.MaxLogLength) + ";1H")
@@ -125,12 +129,23 @@ func checkAttack(dInterface interface{}) {
 func printStats() {
 	result, err := cpu.Percent(0, false)
 	if err != nil {
+		proxy.CpuUsage = "ERR"
 		fmt.Println("[" + utils.RedText("+") + "] [ " + utils.RedText("Cpu Usage") + " ] > [ " + utils.RedText(err.Error()) + " ]")
 	} else if len(result) > 0 {
-		fmt.Println("[" + utils.RedText("+") + "] [ " + utils.RedText("Cpu Usage") + " ] > [ " + utils.RedText(fmt.Sprintf("%.2f", result[0])) + " ]")
+		proxy.CpuUsage = fmt.Sprintf("%.2f", result[0])
+		fmt.Println("[" + utils.RedText("+") + "] [ " + utils.RedText("Cpu Usage") + " ] > [ " + utils.RedText(proxy.CpuUsage) + " ]")
 	} else {
+		proxy.CpuUsage = "ERR_S0"
 		fmt.Println("[" + utils.RedText("+") + "] [ " + utils.RedText("Cpu Usage") + " ] > [ " + utils.RedText("100.00 ( Speculated )") + " ]")
 	}
+
+	//Not printed yet but calculated ram usage in %
+
+	var ramStats runtime.MemStats
+	runtime.ReadMemStats(&ramStats)
+
+	// Calculate the current memory usage in percentage
+	proxy.RamUsage = fmt.Sprintf("%.2f", float64(ramStats.Alloc)/float64(ramStats.Sys)*100)
 
 	fmt.Println("")
 
@@ -438,5 +453,18 @@ func clearOutdatedCache() {
 			return true
 		})
 		time.Sleep(5 * time.Hour)
+	}
+}
+
+func generateOTPSecrets() {
+	for {
+		currTime := time.Now()
+		currDate := currTime.Format("2006-01-02")
+
+		proxy.CookieOTP = utils.EncryptSha(proxy.CookieSecret, currDate)
+		proxy.JSOTP = utils.EncryptSha(proxy.CookieSecret, currDate)
+		proxy.CaptchaOTP = utils.EncryptSha(proxy.CookieSecret, currDate)
+
+		time.Sleep(1 * time.Minute)
 	}
 }

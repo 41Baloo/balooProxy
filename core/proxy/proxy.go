@@ -7,9 +7,20 @@ var (
 	Cloudflare    bool
 	MaxLogLength  int
 
-	CookieSecret  string
-	JSSecret      string
+	CpuUsage string
+	RamUsage string
+
+	AdminSecret string
+	APISecret   string
+
+	CookieSecret string
+	CookieOTP    string
+
+	JSSecret string
+	JSOTP    string
+
 	CaptchaSecret string
+	CaptchaOTP    string
 
 	IPRatelimit            int
 	FPRatelimit            int

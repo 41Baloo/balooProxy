@@ -5,9 +5,10 @@ import (
 	"context"
 	"encoding/base64"
 	"fmt"
-	"goProxy/core/dashboard"
+	"goProxy/core/api"
 	"goProxy/core/domains"
 	"goProxy/core/firewall"
+	"goProxy/core/proxy"
 	"goProxy/core/utils"
 	"image"
 	"image/color"
@@ -25,10 +26,10 @@ import (
 func Middleware(writer http.ResponseWriter, request *http.Request) {
 	domainName := request.Host
 
-	domain, ok := domains.Get(request.Host)
+	domain, ok := domains.Get(domainName)
 	if ok != nil {
 		writer.Header().Set("Content-Type", "text/plain")
-		fmt.Fprintf(writer, "balooProxy: "+request.Host+" does not exist. If you are the owner please check your config.json if you believe this is a mistake")
+		fmt.Fprintf(writer, "balooProxy: "+domainName+" does not exist. If you are the owner please check your config.json if you believe this is a mistake")
 		return
 	}
 
@@ -166,11 +167,11 @@ func Middleware(writer http.ResponseWriter, request *http.Request) {
 		case 0:
 			//whitelisted
 		case 1:
-			encryptedIP = utils.Encrypt(ip+tlsFp+fmt.Sprint(hr), domains.Config.Proxy.Secrets["cookie"])
+			encryptedIP = utils.Encrypt(ip+tlsFp+fmt.Sprint(hr), proxy.CookieOTP)
 		case 2:
-			encryptedIP = utils.Encrypt(ip+tlsFp+fmt.Sprint(hr), domains.Config.Proxy.Secrets["javascript"])
+			encryptedIP = utils.Encrypt(ip+tlsFp+fmt.Sprint(hr), proxy.JSOTP)
 		case 3:
-			encryptedIP = utils.Encrypt(ip+tlsFp+fmt.Sprint(hr), domains.Config.Proxy.Secrets["captcha"])
+			encryptedIP = utils.Encrypt(ip+tlsFp+fmt.Sprint(hr), proxy.CaptchaOTP)
 		default:
 			writer.Header().Set("Content-Type", "text/plain")
 			fmt.Fprintf(writer, "Blocked by BalooProxy.\nSuspicious request of level %d (base %d)", susLv, domain.Stage)
@@ -241,7 +242,6 @@ func Middleware(writer http.ResponseWriter, request *http.Request) {
 			}
 
 			writer.Header().Set("Content-Type", "text/html")
-
 			fmt.Fprintf(writer,
 				`
 					<html>
@@ -518,21 +518,10 @@ func Middleware(writer http.ResponseWriter, request *http.Request) {
 		fmt.Fprintf(writer, "verified")
 		domains.DomainsMap.Store(domainName, domain)
 		return
-	case "/_bProxy/" + domains.Config.Proxy.AdminSecret + "/login":
-		writer.Header().Set("Content-Type", "text/html")
-		dashboard.PageLogin(writer, request)
-		domains.DomainsMap.Store(domainName, domain)
-		return
-	case "/_bProxy/" + domains.Config.Proxy.AdminSecret + "/create":
-		if request.Method == "POST" {
-			dashboard.PageCreate(writer, request)
-			domains.DomainsMap.Store(domainName, domain)
+	case "/_bProxy/" + domains.Config.Proxy.AdminSecret + "/api/v1":
+		if api.Process(writer, request, domain) {
 			return
 		}
-	case "/_bProxy/" + domains.Config.Proxy.AdminSecret + "/dash":
-		dashboard.PageDashboard(writer, request)
-		domains.DomainsMap.Store(domainName, domain)
-		return
 	//Do not remove or modify this. It is required by the license
 	case "/_bProxy/credits":
 		writer.Header().Set("Content-Type", "text/plain")

@@ -47,10 +47,12 @@ type DomainSettings struct {
 	BypassAttack     bool
 	LastLogs         []string
 
-	CustomRules []Rule
-	IPInfo      bool
+	CustomRules    []Rule
+	IPInfo         bool
+	RawCustomRules []JsonRule
 
-	CacheRules []Rule
+	CacheRules    []Rule
+	RawCacheRules []JsonRule
 
 	DomainProxy        *httputil.ReverseProxy
 	DomainCertificates tls.Certificate
@@ -80,6 +82,7 @@ type Proxy struct {
 	Cloudflare    bool              `json:"cloudflare"`
 	MaxLogLength  int               `json:"maxLogLength"`
 	AdminSecret   string            `json:"adminsecret"`
+	APISecret     string            `json:"apisecret"`
 	Secrets       map[string]string `json:"secrets"`
 	Ratelimits    map[string]int    `json:"ratelimits"`
 	MaxHeaderSize int               `json:"maxHeaderSize"`
