@@ -518,8 +518,9 @@ func Middleware(writer http.ResponseWriter, request *http.Request) {
 		fmt.Fprintf(writer, "verified")
 		domains.DomainsMap.Store(domainName, domain)
 		return
-	case "/_bProxy/" + domains.Config.Proxy.AdminSecret + "/api/v1":
-		if api.Process(writer, request, domain) {
+	case "/_bProxy/" + proxy.AdminSecret + "/api/v1":
+		result := api.Process(writer, request, domain)
+		if result {
 			return
 		}
 	//Do not remove or modify this. It is required by the license

@@ -2,6 +2,7 @@ package utils
 
 import (
 	"bufio"
+	"encoding/json"
 	"fmt"
 	"goProxy/core/domains"
 	"goProxy/core/proxy"
@@ -122,4 +123,13 @@ func AskString(question string, defaultVal string) string {
 		return defaultVal
 	}
 	return input
+}
+
+func JsonEscape(i string) string {
+	b, err := json.Marshal(i)
+	if err != nil {
+		panic(err)
+	}
+	// Trim the beginning and trailing " character
+	return string(b[1 : len(b)-1])
 }

@@ -95,10 +95,10 @@ func checkAttack(dInterface interface{}) {
 				dValue.PeakRequestsBypassedPerSecond = dValue.RequestsBypassedPerSecond
 			}
 			dValue.RequestLogger = append(dValue.RequestLogger, domains.RequestLog{
-				Time:    time.Now(),
-				Allowed: dValue.RequestsBypassedPerSecond,
-				Total:   dValue.RequestsPerSecond,
-				CpuUsage:     proxy.CpuUsage,
+				Time:     time.Now(),
+				Allowed:  dValue.RequestsBypassedPerSecond,
+				Total:    dValue.RequestsPerSecond,
+				CpuUsage: proxy.CpuUsage,
 			})
 		}
 
@@ -108,10 +108,10 @@ func checkAttack(dInterface interface{}) {
 			dValue.PeakRequestsPerSecond = dValue.RequestsPerSecond
 			dValue.PeakRequestsBypassedPerSecond = dValue.RequestsBypassedPerSecond
 			dValue.RequestLogger = append(dValue.RequestLogger, domains.RequestLog{
-				Time:    time.Now(),
-				Allowed: dValue.RequestsBypassedPerSecond,
-				Total:   dValue.RequestsPerSecond,
-				CpuUsage:     proxy.CpuUsage,
+				Time:     time.Now(),
+				Allowed:  dValue.RequestsBypassedPerSecond,
+				Total:    dValue.RequestsPerSecond,
+				CpuUsage: proxy.CpuUsage,
 			})
 			go utils.SendWebhook(dValue, int(0))
 		} else if dValue.Stage == 2 && dValue.RequestsBypassedPerSecond > dValue.BypassStage2 {
@@ -303,15 +303,21 @@ func reloadConfig() {
 	proxy.CaptchaSecret = domains.Config.Proxy.Secrets["captcha"]
 
 	// Check if the Proxy Timeout Config has been set otherwise use default values
-	proxyTimeout := domains.Config.Proxy.Timeout
-	if proxyTimeout.Idle != 0 &&
-		proxyTimeout.Read != 0 &&
-		proxyTimeout.Write != 0 &&
-		proxyTimeout.ReadHeader != 0 {
+
+	if domains.Config.Proxy.Timeout.Idle != 0 {
 		proxy.IdleTimeout = domains.Config.Proxy.Timeout.Idle
+	}
+
+	if domains.Config.Proxy.Timeout.Read != 0 {
 		proxy.ReadTimout = domains.Config.Proxy.Timeout.Read
-		proxy.WriteTimeout = domains.Config.Proxy.Timeout.Write
+	}
+
+	if domains.Config.Proxy.Timeout.ReadHeader != 0 {
 		proxy.ReadHeaderTimeout = domains.Config.Proxy.Timeout.ReadHeader
+	}
+
+	if domains.Config.Proxy.Timeout.Write != 0 {
+		proxy.WriteTimeout = domains.Config.Proxy.Timeout.Write
 	}
 
 	proxy.IPRatelimit = domains.Config.Proxy.Ratelimits["requests"]

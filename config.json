@@ -58,12 +58,8 @@
             ],
             "cacheRules": [
                 {
-                    "expression": "(http.query eq \"cache=false\")",
-                    "action": "BYPASS"
-                },
-                {
-                    "expression": "(http.path eq \"/fullcache\")",
-                    "action": "DEFAULT_STRICT"
+                    "expression": "(http.path contains \".js\" or http.path contains \".ico\" or http.path contains \".css\")",
+                    "action": "CACHE_DEFAULT"
                 },
                 {
                     "expression": "(http.path eq \"/my-ip\")",

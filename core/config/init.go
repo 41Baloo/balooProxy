@@ -3,7 +3,6 @@ package config
 import (
 	"crypto/tls"
 	"encoding/json"
-	"fmt"
 	"goProxy/core/db"
 	"goProxy/core/domains"
 	"goProxy/core/firewall"
@@ -23,8 +22,6 @@ func Load() {
 	if err != nil {
 		if os.IsNotExist(err) {
 			Generate()
-			fmt.Println("[ " + utils.RedText("You can now register your admin account on https://"+domains.Config.Domains[0].Name+"/_bProxy/"+domains.Config.Proxy.AdminSecret+"/login") + " (Press enter before continuing) ]")
-			utils.ReadTerminal()
 		} else {
 			panic(err)
 		}
@@ -37,17 +34,25 @@ func Load() {
 	proxy.CookieSecret = domains.Config.Proxy.Secrets["cookie"]
 	proxy.JSSecret = domains.Config.Proxy.Secrets["javascript"]
 	proxy.CaptchaSecret = domains.Config.Proxy.Secrets["captcha"]
+	proxy.AdminSecret = domains.Config.Proxy.AdminSecret
+	proxy.APISecret = domains.Config.Proxy.APISecret
 
 	// Check if the Proxy Timeout Config has been set otherwise use default values
-	proxyTimeout := domains.Config.Proxy.Timeout
-	if proxyTimeout.Idle != 0 &&
-		proxyTimeout.Read != 0 &&
-		proxyTimeout.Write != 0 &&
-		proxyTimeout.ReadHeader != 0 {
+
+	if domains.Config.Proxy.Timeout.Idle != 0 {
 		proxy.IdleTimeout = domains.Config.Proxy.Timeout.Idle
+	}
+
+	if domains.Config.Proxy.Timeout.Read != 0 {
 		proxy.ReadTimout = domains.Config.Proxy.Timeout.Read
-		proxy.WriteTimeout = domains.Config.Proxy.Timeout.Write
+	}
+
+	if domains.Config.Proxy.Timeout.ReadHeader != 0 {
 		proxy.ReadHeaderTimeout = domains.Config.Proxy.Timeout.ReadHeader
+	}
+
+	if domains.Config.Proxy.Timeout.Write != 0 {
+		proxy.WriteTimeout = domains.Config.Proxy.Timeout.Write
 	}
 
 	proxy.IPRatelimit = domains.Config.Proxy.Ratelimits["requests"]

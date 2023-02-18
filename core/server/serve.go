@@ -20,10 +20,10 @@ import (
 )
 
 func Serve() {
-	idleTimeout := time.Duration(domains.Config.Proxy.Timeout.Idle).Abs() * time.Second
-	readTimeout := time.Duration(domains.Config.Proxy.Timeout.Read).Abs() * time.Second
-	writeTimeout := time.Duration(domains.Config.Proxy.Timeout.Write).Abs() * time.Second
-	readHeaderTimeout := time.Duration(domains.Config.Proxy.Timeout.ReadHeader).Abs() * time.Second
+	idleTimeout := time.Duration(proxy.IdleTimeout).Abs() * time.Second
+	readTimeout := time.Duration(proxy.ReadTimout).Abs() * time.Second
+	writeTimeout := time.Duration(proxy.WriteTimeout).Abs() * time.Second
+	readHeaderTimeout := time.Duration(proxy.ReadHeaderTimeout).Abs() * time.Second
 
 	if domains.Config.Proxy.Cloudflare {
 		service := &http.Server{
@@ -156,7 +156,7 @@ func (rt *RoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
 	transport := &http.Transport{
 		DialContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
 			return (&net.Dialer{
-				Timeout: time.Duration(domains.Config.Proxy.Timeout.Read).Abs() * time.Second,
+				Timeout: 5 * time.Second,
 			}).DialContext(ctx, network, addr)
 		},
 		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
