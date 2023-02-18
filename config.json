@@ -3,11 +3,12 @@
         "version": 1.2,
         "cloudflare": false,
         "maxLogLength": 10,
-        "adminsecret": "8rh32RJxAKgjLTzN0KHtHydn1",
+        "adminsecret": "CHANGE_ME",
+        "apisecret": "CHANGE_NE",
         "secrets": {
-            "captcha": "z1JMTgDaT7njETfx71ea",
-            "cookie": "fpF5LjEaJ6P9DZrPFmEh",
-            "javascript": "SQu4hdPxTfBfeVg9qhIh"
+            "captcha": "CHANGE_ME",
+            "cookie": "CHANGE_ME",
+            "javascript": "CHANGE_ME"
         },
         "timeout": {
             "idle": 10,
