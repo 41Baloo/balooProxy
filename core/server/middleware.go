@@ -77,7 +77,7 @@ func Middleware(writer http.ResponseWriter, request *http.Request) {
 	susLv := domain.Stage
 
 	//Ratelimit faster if client repeatedly fails the verification challenge (feel free to play around with the threshhold)
-	if ipCountCookie > domains.Config.Proxy.Ratelimits["challengeFailures"] {
+	if ipCountCookie > proxy.FailChallengeRatelimit {
 		writer.Header().Set("Content-Type", "text/plain")
 		fmt.Fprintf(writer, "Blocked by BalooProxy.\nYou have been ratelimited. (R1)")
 		domains.DomainsMap.Store(domainName, domain)
@@ -85,7 +85,7 @@ func Middleware(writer http.ResponseWriter, request *http.Request) {
 	}
 
 	//Ratelimit spamming Ips (feel free to play around with the threshhold)
-	if ipCount > domains.Config.Proxy.Ratelimits["requests"] {
+	if ipCount > proxy.IPRatelimit {
 		writer.Header().Set("Content-Type", "text/plain")
 		fmt.Fprintf(writer, "Blocked by BalooProxy.\nYou have been ratelimited. (R2)")
 		domains.DomainsMap.Store(domainName, domain)
@@ -94,7 +94,7 @@ func Middleware(writer http.ResponseWriter, request *http.Request) {
 
 	//Ratelimit fingerprints that don't belong to major browsers
 	if browser == "" {
-		if fpCount > domains.Config.Proxy.Ratelimits["unknownFingerprint"] {
+		if fpCount > proxy.FPRatelimit {
 			writer.Header().Set("Content-Type", "text/plain")
 			fmt.Fprintf(writer, "Blocked by BalooProxy.\nYou have been ratelimited. (R3)")
 			domains.DomainsMap.Store(domainName, domain)
@@ -503,13 +503,13 @@ func Middleware(writer http.ResponseWriter, request *http.Request) {
 	switch request.URL.Path {
 	case "/_bProxy/stats":
 		writer.Header().Set("Content-Type", "text/plain")
-		fmt.Fprintf(writer, "Total Requests: %s\nBypassed Requests: %s\nTotal R/s: %s\nBypassed R/s: %s", fmt.Sprint(domain.TotalRequests), fmt.Sprint(domain.BypassedRequests), fmt.Sprint(domain.RequestsPerSecond), fmt.Sprint(domain.RequestsBypassedPerSecond))
+		fmt.Fprintf(writer, "Stage: %s\nTotal Requests: %s\nBypassed Requests: %s\nTotal R/s: %s\nBypassed R/s: %s", fmt.Sprint(domain.Stage), fmt.Sprint(domain.TotalRequests), fmt.Sprint(domain.BypassedRequests), fmt.Sprint(domain.RequestsPerSecond), fmt.Sprint(domain.RequestsBypassedPerSecond))
 		domains.DomainsMap.Store(domainName, domain)
 		return
 	case "/_bProxy/fingerprint":
 		writer.Header().Set("Content-Type", "text/plain")
 		firewall.Mutex.Lock()
-		fmt.Fprintf(writer, "IP: "+ip+"\nASN: "+fmt.Sprint(ipInfoASN)+"\nCountry: "+ipInfoCountry+"\nIP Requests: "+fmt.Sprint(ipCount)+"\nIP Challenge Requests: "+fmt.Sprint(firewall.AccessIpsCookie[ip])+"\nFingerprint: "+tlsFp+"\nBrowser: "+browser+botFp)
+		fmt.Fprintf(writer, "IP: "+ip+"\nASN: "+fmt.Sprint(ipInfoASN)+"\nCountry: "+ipInfoCountry+"\nIP Requests: "+fmt.Sprint(ipCount)+"\nIP Challenge Requests: "+fmt.Sprint(firewall.AccessIpsCookie[ip])+"\nSusLV: "+fmt.Sprint(susLv)+"\nFingerprint: "+tlsFp+"\nBrowser: "+browser+botFp)
 		firewall.Mutex.Unlock()
 		domains.DomainsMap.Store(domainName, domain)
 		return

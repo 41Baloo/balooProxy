@@ -487,8 +487,8 @@ func generateOTPSecrets() {
 		currDate := currTime.Format("2006-01-02")
 
 		proxy.CookieOTP = utils.EncryptSha(proxy.CookieSecret, currDate)
-		proxy.JSOTP = utils.EncryptSha(proxy.CookieSecret, currDate)
-		proxy.CaptchaOTP = utils.EncryptSha(proxy.CookieSecret, currDate)
+		proxy.JSOTP = utils.EncryptSha(proxy.JSSecret, currDate)
+		proxy.CaptchaOTP = utils.EncryptSha(proxy.CaptchaSecret, currDate)
 
 		time.Sleep(1 * time.Minute)
 	}
