@@ -34,8 +34,6 @@ func Generate() {
 				"challengeFailures":  utils.AskInt("After How Many Failed Attempts At Solving A Challenge From An IP Within 2 Minutes Should It Be Blocked?", 40),
 				"noRequestsSent":     utils.AskInt("After How Many TCP Connection Attempts Without Sending A Http Request From An IP Within 2 Minutes Should It Be Blocked?", 10),
 			},
-			MaxHeaderSize: utils.AskInt("What Should Be The Maximum Size For Request Headers In Bytes", 3000000),
-			MaxBodySize:   utils.AskInt("What Should Be The Maximum Size For Request Bodies In Bytes", 20000000),
 		},
 		Domains: []domains.Domain{},
 	}

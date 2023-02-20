@@ -329,9 +329,6 @@ func reloadConfig() {
 	proxy.FailChallengeRatelimit = domains.Config.Proxy.Ratelimits["challengeFailures"]
 	proxy.FailRequestRatelimit = domains.Config.Proxy.Ratelimits["noRequestsSent"]
 
-	proxy.MaxHeaderSize = domains.Config.Proxy.MaxHeaderSize
-	proxy.MaxBodySize = domains.Config.Proxy.MaxBodySize
-
 	for i, domain := range domains.Config.Domains {
 		domains.Domains = append(domains.Domains, domain.Name)
 

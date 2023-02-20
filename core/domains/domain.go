@@ -79,15 +79,13 @@ type DomainSettings struct {
 }
 
 type Proxy struct {
-	Cloudflare    bool              `json:"cloudflare"`
-	MaxLogLength  int               `json:"maxLogLength"`
-	AdminSecret   string            `json:"adminsecret"`
-	APISecret     string            `json:"apisecret"`
-	Secrets       map[string]string `json:"secrets"`
-	Timeout       TimeoutSettings   `json:"timeout"`
-	Ratelimits    map[string]int    `json:"ratelimits"`
-	MaxHeaderSize int               `json:"maxHeaderSize"`
-	MaxBodySize   int               `json:"maxBodySize"`
+	Cloudflare   bool              `json:"cloudflare"`
+	MaxLogLength int               `json:"maxLogLength"`
+	AdminSecret  string            `json:"adminsecret"`
+	APISecret    string            `json:"apisecret"`
+	Secrets      map[string]string `json:"secrets"`
+	Timeout      TimeoutSettings   `json:"timeout"`
+	Ratelimits   map[string]int    `json:"ratelimits"`
 }
 
 type TimeoutSettings struct {

@@ -50,7 +50,7 @@ func AddLogs(entry string, domain domains.DomainSettings) domains.DomainSettings
 }
 
 func MoveInputLine() {
-	fmt.Println("\033[" + fmt.Sprint(12+10) + ";1H")
+	fmt.Println("\033[" + fmt.Sprint(12+proxy.MaxLogLength) + ";1H")
 	fmt.Print("[ " + RedText("Command") + " ]: \033[u\033[s")
 }
 

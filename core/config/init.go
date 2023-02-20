@@ -65,9 +65,6 @@ func Load() {
 	proxy.FailChallengeRatelimit = domains.Config.Proxy.Ratelimits["challengeFailures"]
 	proxy.FailRequestRatelimit = domains.Config.Proxy.Ratelimits["noRequestsSent"]
 
-	proxy.MaxHeaderSize = domains.Config.Proxy.MaxHeaderSize
-	proxy.MaxBodySize = domains.Config.Proxy.MaxBodySize
-
 	GetFingerprints("https://raw.githubusercontent.com/41Baloo/balooProxy/main/global/fingerprints/known_fingerprints.json", &firewall.KnwonFingerprints)
 	GetFingerprints("https://raw.githubusercontent.com/41Baloo/balooProxy/main/global/fingerprints/bot_fingerprints.json", &firewall.BotFingerprints)
 	GetFingerprints("https://raw.githubusercontent.com/41Baloo/balooProxy/main/global/fingerprints/malicious_fingerprints.json", &firewall.ForbiddenFingerprints)

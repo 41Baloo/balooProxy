@@ -25,7 +25,7 @@ var (
 	CaptchaOTP    string
 
 	IdleTimeout       = 5
-	ReadTimeout        = 5
+	ReadTimeout       = 5
 	WriteTimeout      = 7
 	ReadHeaderTimeout = 5
 
@@ -38,9 +38,6 @@ var (
 	FPRatelimit            int
 	FailChallengeRatelimit int
 	FailRequestRatelimit   int
-
-	MaxHeaderSize int
-	MaxBodySize   int
 
 	RealTimeLogs = false
 

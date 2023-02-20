@@ -21,9 +21,7 @@
             "noRequestsSent": 10,
             "requests": 1000,
             "unknownFingerprint": 150
-        },
-        "maxHeaderSize": 3000000,
-        "maxBodySize": 20000000
+        }
     },
     "domains": [
         {
