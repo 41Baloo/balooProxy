@@ -1,5 +1,7 @@
 package proxy
 
+import "time"
+
 var (
 	WatchedDomain string
 	TWidth        int
@@ -23,9 +25,14 @@ var (
 	CaptchaOTP    string
 
 	IdleTimeout       = 5
-	ReadTimout        = 5
+	ReadTimeout        = 5
 	WriteTimeout      = 7
 	ReadHeaderTimeout = 5
+
+	IdleTimeoutDuration       = time.Duration(IdleTimeout).Abs() * time.Second
+	ReadTimeoutDuration       = time.Duration(ReadTimeout).Abs() * time.Second
+	WriteTimeoutDuration      = time.Duration(WriteTimeout).Abs() * time.Second
+	ReadHeaderTimeoutDuration = time.Duration(ReadHeaderTimeout).Abs() * time.Second
 
 	IPRatelimit            int
 	FPRatelimit            int

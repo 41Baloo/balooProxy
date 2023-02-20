@@ -10,7 +10,6 @@ import (
 	"goProxy/core/proxy"
 	"goProxy/core/utils"
 	"io"
-	"io/ioutil"
 	"net"
 	"net/http"
 	"strings"
@@ -20,17 +19,13 @@ import (
 )
 
 func Serve() {
-	idleTimeout := time.Duration(proxy.IdleTimeout).Abs() * time.Second
-	readTimeout := time.Duration(proxy.ReadTimout).Abs() * time.Second
-	writeTimeout := time.Duration(proxy.WriteTimeout).Abs() * time.Second
-	readHeaderTimeout := time.Duration(proxy.ReadHeaderTimeout).Abs() * time.Second
 
 	if domains.Config.Proxy.Cloudflare {
 		service := &http.Server{
-			IdleTimeout:       idleTimeout,
-			ReadTimeout:       readTimeout,
-			WriteTimeout:      writeTimeout,
-			ReadHeaderTimeout: readHeaderTimeout,
+			IdleTimeout:       proxy.IdleTimeoutDuration,
+			ReadTimeout:       proxy.ReadTimeoutDuration,
+			WriteTimeout:      proxy.WriteTimeoutDuration,
+			ReadHeaderTimeout: proxy.ReadHeaderTimeoutDuration,
 			Addr:              ":80",
 		}
 
@@ -42,18 +37,18 @@ func Serve() {
 		}
 	} else {
 		service := &http.Server{
-			IdleTimeout:       idleTimeout,
-			ReadTimeout:       readTimeout,
-			WriteTimeout:      writeTimeout,
-			ReadHeaderTimeout: readHeaderTimeout,
+			IdleTimeout:       proxy.IdleTimeoutDuration,
+			ReadTimeout:       proxy.ReadTimeoutDuration,
+			WriteTimeout:      proxy.WriteTimeoutDuration,
+			ReadHeaderTimeout: proxy.ReadHeaderTimeoutDuration,
 			ConnState:         firewall.OnStateChange,
 			Addr:              ":80",
 		}
 		serviceH := &http.Server{
-			IdleTimeout:       idleTimeout,
-			ReadTimeout:       readTimeout,
-			WriteTimeout:      writeTimeout,
-			ReadHeaderTimeout: readHeaderTimeout,
+			IdleTimeout:       proxy.IdleTimeoutDuration,
+			ReadTimeout:       proxy.ReadTimeoutDuration,
+			WriteTimeout:      proxy.WriteTimeoutDuration,
+			ReadHeaderTimeout: proxy.ReadHeaderTimeoutDuration,
 			ConnState:         firewall.OnStateChange,
 			Addr:              ":443",
 			TLSConfig: &tls.Config{
@@ -243,7 +238,7 @@ func (rt *RoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
 	}
 
 	//Connection was successfull, got bad response tho
-	if resp.StatusCode >= 500 && resp.StatusCode < 600 {
+	if resp.StatusCode > 499 && resp.StatusCode < 600 {
 
 		errPage := `
 			<!DOCTYPE html>
@@ -307,7 +302,7 @@ func (rt *RoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
 			</html>
 		`
 
-		errBody, errErr := ioutil.ReadAll(resp.Body)
+		errBody, errErr := io.ReadAll(resp.Body)
 		if errErr == nil && len(errBody) != 0 {
 			errPage =
 				`
@@ -386,47 +381,48 @@ func (rt *RoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
 
 	resp.Header.Set("proxy-cache", "MISS")
 
-	if (resp.StatusCode < 300 || (resp.StatusCode < 500 && resp.StatusCode >= 400)) && cacheRes != 0 {
-		bodyBytes, bodyErr := io.ReadAll(resp.Body)
+	if cacheRes != 0 && req.Method != "POST" {
+		if resp.StatusCode < 300 || (resp.StatusCode < 500 && resp.StatusCode >= 400) {
+			bodyBytes, bodyErr := io.ReadAll(resp.Body)
 
-		resp.Body = io.NopCloser(bytes.NewReader(bodyBytes))
+			resp.Body = io.NopCloser(bytes.NewReader(bodyBytes))
 
-		if bodyErr != nil {
-			return &http.Response{
-				StatusCode: http.StatusBadGateway,
-				Body:       io.NopCloser(strings.NewReader("BalooProxy: Failed to read responsebody of backend")),
-			}, bodyErr
+			if bodyErr != nil {
+				return &http.Response{
+					StatusCode: http.StatusBadGateway,
+					Body:       io.NopCloser(strings.NewReader("BalooProxy: Failed to read responsebody of backend")),
+				}, bodyErr
+			}
+
+			var cacheKey string
+			switch cacheRes {
+			case proxy.CACHE_DEFAULT:
+				cacheKey = req.Host + req.URL.Path + req.URL.RawQuery + req.Method
+			case proxy.CACHE_DEFAULT_STRICT:
+				cacheKey = req.Host + req.URL.Path + req.URL.RawQuery
+			case proxy.CACHE_CAREFUL:
+				cacheKey = req.Host + reqIP + req.URL.Path + req.URL.RawQuery + req.Method
+			case proxy.CACHE_CAREFUL_STRICT:
+				cacheKey = req.Host + reqIP + req.URL.Path + req.URL.RawQuery
+			case proxy.CACHE_IGNORE_QUERY:
+				cacheKey = req.Host + req.URL.Path
+			case proxy.CACHE_QUERY:
+				cacheKey = req.Host + req.URL.RawQuery
+			case proxy.CACHE_CLIENTIP:
+				cacheKey = req.Host + reqIP
+			default:
+				panic("[ " + utils.RedText("Error") + " ]: " + utils.RedText("Cache Error: Failed to get correct cache resp"))
+			}
+
+			domains.DomainsCache.Store(cacheKey, domains.CacheResponse{
+				Domain:    resp.Request.Host,
+				Timestamp: int(time.Now().Unix()) + 3600, //Cache for an hour
+				Status:    resp.StatusCode,
+				Headers:   resp.Header,
+				Body:      bodyBytes,
+			})
 		}
-
-		var cacheKey string
-		switch cacheRes {
-		case proxy.CACHE_DEFAULT:
-			cacheKey = req.Host + req.URL.Path + req.URL.RawQuery + req.Method
-		case proxy.CACHE_DEFAULT_STRICT:
-			cacheKey = req.Host + req.URL.Path + req.URL.RawQuery
-		case proxy.CACHE_CAREFUL:
-			cacheKey = req.Host + reqIP + req.URL.Path + req.URL.RawQuery + req.Method
-		case proxy.CACHE_CAREFUL_STRICT:
-			cacheKey = req.Host + reqIP + req.URL.Path + req.URL.RawQuery
-		case proxy.CACHE_IGNORE_QUERY:
-			cacheKey = req.Host + req.URL.Path
-		case proxy.CACHE_QUERY:
-			cacheKey = req.Host + req.URL.RawQuery
-		case proxy.CACHE_CLIENTIP:
-			cacheKey = req.Host + reqIP
-		default:
-			panic("[ " + utils.RedText("Error") + " ]: " + utils.RedText("Cache Error: Failed to get correct cache resp"))
-		}
-
-		domains.DomainsCache.Store(cacheKey, domains.CacheResponse{
-			Domain:    resp.Request.Host,
-			Timestamp: int(time.Now().Unix()) + 3600, //Cache for an hour
-			Status:    resp.StatusCode,
-			Headers:   resp.Header,
-			Body:      bodyBytes,
-		})
 	}
-
 	return resp, nil
 }
 

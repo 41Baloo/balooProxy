@@ -532,6 +532,7 @@ func Middleware(writer http.ResponseWriter, request *http.Request) {
 	}
 
 	//Allow backend to read client information
+	request.Header.Add("x-real-ip", ip)
 	request.Header.Add("proxy-real-ip", ip)
 	request.Header.Add("proxy-tls-fp", tlsFp)
 	request.Header.Add("proxy-tls-name", browser+botFp)

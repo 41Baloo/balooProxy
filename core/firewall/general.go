@@ -1,7 +1,6 @@
 package firewall
 
 import (
-	"fmt"
 	"goProxy/core/proxy"
 	"net"
 	"net/http"
@@ -34,7 +33,9 @@ var (
 
 func OnStateChange(conn net.Conn, state http.ConnState) {
 
-	ip := strings.Split(conn.RemoteAddr().String(), ":")[0]
+	remoteAddr := conn.RemoteAddr().String()
+
+	ip := strings.Split(remoteAddr, ":")[0]
 
 	switch state {
 	case http.StateNew:
@@ -42,7 +43,6 @@ func OnStateChange(conn net.Conn, state http.ConnState) {
 		fpReq := TcpRequests[ip]
 		successCount := AccessIps[ip]
 		challengeCount := AccessIpsCookie[ip]
-		TcpRequests[ip] = TcpRequests[ip] + 1
 		Mutex.Unlock()
 
 		//We can ratelimit so extremely here because normal browsers will send actual webrequests instead of only establishing connections
@@ -50,10 +50,14 @@ func OnStateChange(conn net.Conn, state http.ConnState) {
 			defer conn.Close()
 			return
 		}
+
+		Mutex.Lock()
+		TcpRequests[ip] = TcpRequests[ip] + 1
+		Mutex.Unlock()
 	case http.StateHijacked, http.StateClosed:
 		//Remove connection from list of fingerprints as it's no longer needed
 		Mutex.Lock()
-		delete(Connections, fmt.Sprint(conn.RemoteAddr()))
+		delete(Connections, remoteAddr)
 		Mutex.Unlock()
 	}
 }

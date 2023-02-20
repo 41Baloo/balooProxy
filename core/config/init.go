@@ -13,6 +13,7 @@ import (
 	"net/url"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/kor44/gofilter"
 )
@@ -41,18 +42,22 @@ func Load() {
 
 	if domains.Config.Proxy.Timeout.Idle != 0 {
 		proxy.IdleTimeout = domains.Config.Proxy.Timeout.Idle
+		proxy.IdleTimeoutDuration = time.Duration(proxy.IdleTimeout).Abs() * time.Second
 	}
 
 	if domains.Config.Proxy.Timeout.Read != 0 {
-		proxy.ReadTimout = domains.Config.Proxy.Timeout.Read
+		proxy.ReadTimeout = domains.Config.Proxy.Timeout.Read
+		proxy.ReadTimeoutDuration = time.Duration(proxy.ReadTimeout).Abs() * time.Second
 	}
 
 	if domains.Config.Proxy.Timeout.ReadHeader != 0 {
 		proxy.ReadHeaderTimeout = domains.Config.Proxy.Timeout.ReadHeader
+		proxy.ReadHeaderTimeoutDuration = time.Duration(proxy.ReadHeaderTimeout).Abs() * time.Second
 	}
 
 	if domains.Config.Proxy.Timeout.Write != 0 {
 		proxy.WriteTimeout = domains.Config.Proxy.Timeout.Write
+		proxy.WriteTimeoutDuration = time.Duration(proxy.WriteTimeout).Abs() * time.Second
 	}
 
 	proxy.IPRatelimit = domains.Config.Proxy.Ratelimits["requests"]
