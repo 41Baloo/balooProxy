@@ -1,7 +1,7 @@
 {
     "proxy": {
         "version": 1.2,
-        "cloudflare": false,
+        "cloudflare": true,
         "maxLogLength": 10,
         "adminsecret": "CHANGE_ME",
         "apisecret": "CHANGE_NE",
@@ -11,15 +11,15 @@
             "javascript": "CHANGE_ME"
         },
         "timeout": {
-            "idle": 10,
-            "read": 30,
-            "write": 30,
-            "read_header": 10
+            "idle": 5,
+            "read": 5,
+            "write": 7,
+            "read_header": 5
         },
         "ratelimits": {
             "challengeFailures": 40,
             "noRequestsSent": 10,
-            "requests": 1000,
+            "requests": 500,
             "unknownFingerprint": 150
         }
     },

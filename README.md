@@ -1,3 +1,23 @@
+# **Features**
+
+## **TLS-Fingerprinting**
+
+## **Staged DDoS-Mitigation**
+
+### **Cookie Challenge
+
+### **Invisible JS Challenge
+
+### **Custom Captcha**
+
+## **DDoS Alerts**
+
+Always be informed when you are under attack of a (D)DoS attack with customisable discord alerts.
+
+
+
+## **Lightweight**
+
 # **Installation**
 
 In order to install balooProxy simply download the [latest version of balooProxy](https://github.com/41Baloo/balooProxy/releases). You can either use a pre-configured `config.json` or configure your proxy when running it for the first time without a `config.json`.
@@ -65,7 +85,7 @@ Path to your ssl private key (For example `server.key` or `/keys/example.com.key
 ### **Rules**
 ---
 
-Refer to [Custom Firewall Rules](#**Custom-Firewall-Rules**)
+Refer to [Custom Firewall Rules](#Custom-Firewall-Rules)
 
 # **Custom Firewall Rules**
 

@@ -66,7 +66,7 @@ func Monitor() {
 		fmt.Print("\033[1;1H")
 
 		domains.DomainsMap.Range(func(_, dInterface interface{}) bool {
-			go checkAttack(dInterface)
+			checkAttack(dInterface)
 			return false
 		})
 
