@@ -16,15 +16,18 @@ var (
 	PrintMutex = &sync.Mutex{}
 )
 
-func AddLogs(entry string, domain domains.DomainSettings) domains.DomainSettings {
+// Only run in locked thread
+func AddLogs(entry string, domainName string) domains.DomainData {
 
-	PrintMutex.Lock()
-	if len(domain.LastLogs) > proxy.MaxLogLength {
-		domain.LastLogs = domain.LastLogs[1:]
-		domain.LastLogs = append(domain.LastLogs, entry)
+	domainData := domains.DomainsData[domainName]
+
+	if len(domainData.LastLogs) > proxy.MaxLogLength {
+		domainData.LastLogs = domainData.LastLogs[1:]
+		domainData.LastLogs = append(domainData.LastLogs, entry)
 
 		if proxy.RealTimeLogs {
-			for i, log := range domain.LastLogs {
+			PrintMutex.Lock()
+			for i, log := range domainData.LastLogs {
 				if len(log)+4 > proxy.TWidth {
 					fmt.Print("\033[" + fmt.Sprint(11+i) + ";1H\033[K[" + RedText("!") + "] " + log[:len(log)-(len(log)+4-proxy.TWidth)] + " ...\033[0m\n")
 				} else {
@@ -32,21 +35,25 @@ func AddLogs(entry string, domain domains.DomainSettings) domains.DomainSettings
 				}
 			}
 			MoveInputLine()
+			PrintMutex.Unlock()
 		}
-		PrintMutex.Unlock()
-		return domain
+		return domainData
 	}
-	domain.LastLogs = append(domain.LastLogs, entry)
-	if domain.Name == proxy.WatchedDomain && proxy.RealTimeLogs {
+	domainData.LastLogs = append(domainData.LastLogs, entry)
+	if domainName == proxy.WatchedDomain && proxy.RealTimeLogs {
+		PrintMutex.Lock()
 		if len(entry)+4 > proxy.TWidth {
-			fmt.Print("\033[" + fmt.Sprint((10 + len(domain.LastLogs))) + ";1H\033[K[" + RedText("-") + "] " + entry[:len(entry)-(len(entry)+4-proxy.TWidth)] + " ...\033[0m\n")
+			fmt.Print("\033[" + fmt.Sprint((10 + len(domainData.LastLogs))) + ";1H\033[K[" + RedText("-") + "] " + entry[:len(entry)-(len(entry)+4-proxy.TWidth)] + " ...\033[0m\n")
 		} else {
-			fmt.Print("\033[" + fmt.Sprint((10 + len(domain.LastLogs))) + ";1H\033[K[" + RedText("-") + "] " + entry + "\n")
+			fmt.Print("\033[" + fmt.Sprint((10 + len(domainData.LastLogs))) + ";1H\033[K[" + RedText("-") + "] " + entry + "\n")
 		}
+		MoveInputLine()
+		PrintMutex.Unlock()
 	}
-	MoveInputLine()
-	PrintMutex.Unlock()
-	return domain
+
+	domains.DomainsData[domainName] = domainData
+
+	return domainData
 }
 
 func MoveInputLine() {

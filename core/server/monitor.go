@@ -65,67 +65,75 @@ func Monitor() {
 		utils.ClearScreen(proxy.MaxLogLength)
 		fmt.Print("\033[1;1H")
 
-		domains.DomainsMap.Range(func(_, dInterface interface{}) bool {
-			checkAttack(dInterface)
-			return false
-		})
+		for name, data := range domains.DomainsData {
+			firewall.Mutex.Lock()
+			checkAttack(name, data)
+			firewall.Mutex.Unlock()
+		}
 
 		printStats()
 
+		PrintMutex.Unlock()
 		time.Sleep(1 * time.Second)
 	}
 }
 
-func checkAttack(dInterface interface{}) {
-	dValue := dInterface.(domains.DomainSettings)
+// Only run this inside of a locked thread to avoid false reports
+func checkAttack(domainName string, domainData domains.DomainData) {
 
-	dValue.RequestsPerSecond = dValue.TotalRequests - dValue.PrevRequests
-	dValue.RequestsBypassedPerSecond = dValue.BypassedRequests - dValue.PrevBypassed
+	domainData.RequestsPerSecond = domainData.TotalRequests - domainData.PrevRequests
+	domainData.RequestsBypassedPerSecond = domainData.BypassedRequests - domainData.PrevBypassed
 
-	dValue.PrevRequests = dValue.TotalRequests
-	dValue.PrevBypassed = dValue.BypassedRequests
+	domainData.PrevRequests = domainData.TotalRequests
+	domainData.PrevBypassed = domainData.BypassedRequests
 
-	if !dValue.StageManuallySet || dValue.BypassAttack {
+	if !domainData.StageManuallySet || domainData.BypassAttack {
 
-		if dValue.BypassAttack {
-			if dValue.RequestsPerSecond > dValue.PeakRequestsPerSecond {
-				dValue.PeakRequestsPerSecond = dValue.RequestsPerSecond
+		if domainData.BypassAttack {
+			if domainData.RequestsPerSecond > domainData.PeakRequestsPerSecond {
+				domainData.PeakRequestsPerSecond = domainData.RequestsPerSecond
 			}
-			if dValue.RequestsBypassedPerSecond > dValue.PeakRequestsBypassedPerSecond {
-				dValue.PeakRequestsBypassedPerSecond = dValue.RequestsBypassedPerSecond
+			if domainData.RequestsBypassedPerSecond > domainData.PeakRequestsBypassedPerSecond {
+				domainData.PeakRequestsBypassedPerSecond = domainData.RequestsBypassedPerSecond
 			}
-			dValue.RequestLogger = append(dValue.RequestLogger, domains.RequestLog{
+			domainData.RequestLogger = append(domainData.RequestLogger, domains.RequestLog{
 				Time:     time.Now(),
-				Allowed:  dValue.RequestsBypassedPerSecond,
-				Total:    dValue.RequestsPerSecond,
+				Allowed:  domainData.RequestsBypassedPerSecond,
+				Total:    domainData.RequestsPerSecond,
 				CpuUsage: proxy.CpuUsage,
 			})
 		}
 
-		if dValue.Stage == 1 && dValue.RequestsBypassedPerSecond > dValue.BypassStage1 && !dValue.BypassAttack {
-			dValue.BypassAttack = true
-			dValue.Stage = 2
-			dValue.PeakRequestsPerSecond = dValue.RequestsPerSecond
-			dValue.PeakRequestsBypassedPerSecond = dValue.RequestsBypassedPerSecond
-			dValue.RequestLogger = append(dValue.RequestLogger, domains.RequestLog{
+		settingQuery, _ := domains.DomainsMap.Load(domainName)
+		domainSettings := settingQuery.(domains.DomainSettings)
+
+		if domainData.Stage == 1 && domainData.RequestsBypassedPerSecond > domainSettings.BypassStage1 && !domainData.BypassAttack {
+			domainData.BypassAttack = true
+			domainData.Stage = 2
+			domainData.PeakRequestsPerSecond = domainData.RequestsPerSecond
+			domainData.PeakRequestsBypassedPerSecond = domainData.RequestsBypassedPerSecond
+			domainData.RequestLogger = append(domainData.RequestLogger, domains.RequestLog{
 				Time:     time.Now(),
-				Allowed:  dValue.RequestsBypassedPerSecond,
-				Total:    dValue.RequestsPerSecond,
+				Allowed:  domainData.RequestsBypassedPerSecond,
+				Total:    domainData.RequestsPerSecond,
 				CpuUsage: proxy.CpuUsage,
 			})
-			go utils.SendWebhook(dValue, int(0))
-		} else if dValue.Stage == 2 && dValue.RequestsBypassedPerSecond > dValue.BypassStage2 {
-			dValue.Stage = 3
-		} else if dValue.Stage == 3 && dValue.RequestsBypassedPerSecond < dValue.DisableBypassStage3 && dValue.RequestsPerSecond < dValue.DisableRawStage3 {
-			dValue.Stage = 2
-		} else if dValue.Stage == 2 && dValue.RequestsBypassedPerSecond < dValue.DisableBypassStage2 && dValue.RequestsPerSecond < dValue.DisableRawStage2 && dValue.BypassAttack {
-			dValue.BypassAttack = false
-			dValue.Stage = 1
-			go utils.SendWebhook(dValue, int(1))
+			go utils.SendWebhook(domainData, domainSettings, int(0))
+		} else if domainData.Stage == 2 && domainData.RequestsBypassedPerSecond > domainSettings.BypassStage2 {
+			domainData.Stage = 3
+		} else if domainData.Stage == 3 && domainData.RequestsBypassedPerSecond < domainSettings.DisableBypassStage3 && domainData.RequestsPerSecond < domainSettings.DisableRawStage3 {
+			domainData.Stage = 2
+		} else if domainData.Stage == 2 && domainData.RequestsBypassedPerSecond < domainSettings.DisableBypassStage2 && domainData.RequestsPerSecond < domainSettings.DisableRawStage2 && domainData.BypassAttack {
+			domainData.BypassAttack = false
+			domainData.Stage = 1
+			go utils.SendWebhook(domainData, domainSettings, int(1))
+			domainData.PeakRequestsPerSecond = 0
+			domainData.PeakRequestsBypassedPerSecond = 0
+			domainData.RequestLogger = []domains.RequestLog{}
 		}
 	}
 
-	domains.DomainsMap.Store(dValue.Name, dValue)
+	domains.DomainsData[domainName] = domainData
 }
 
 func printStats() {
@@ -151,8 +159,11 @@ func printStats() {
 
 	fmt.Println("")
 
-	dVal, ok := domains.DomainsMap.Load(proxy.WatchedDomain)
-	if !ok {
+	firewall.Mutex.Lock()
+	domainData := domains.DomainsData[proxy.WatchedDomain]
+	firewall.Mutex.Unlock()
+
+	if domainData.Stage == 0 {
 		if proxy.WatchedDomain != "" {
 			fmt.Println("[" + utils.RedText("!") + "] [ " + utils.RedText("Domain \""+proxy.WatchedDomain+"\" Not Found") + " ]")
 			fmt.Println("")
@@ -167,19 +178,17 @@ func printStats() {
 		}
 	} else {
 
-		tempDomain := dVal.(domains.DomainSettings)
-
 		fmt.Println("[" + utils.RedText("+") + "] [ " + utils.RedText("Domain") + " ] > [ " + utils.RedText(proxy.WatchedDomain) + " ]")
-		fmt.Println("[" + utils.RedText("+") + "] [ " + utils.RedText("Stage") + " ] > [ " + utils.RedText(fmt.Sprint(tempDomain.Stage)) + " ]")
-		fmt.Println("[" + utils.RedText("+") + "] [ " + utils.RedText("Stage Locked") + " ] > [ " + utils.RedText(fmt.Sprint(tempDomain.StageManuallySet)) + " ]")
+		fmt.Println("[" + utils.RedText("+") + "] [ " + utils.RedText("Stage") + " ] > [ " + utils.RedText(fmt.Sprint(domainData.Stage)) + " ]")
+		fmt.Println("[" + utils.RedText("+") + "] [ " + utils.RedText("Stage Locked") + " ] > [ " + utils.RedText(fmt.Sprint(domainData.StageManuallySet)) + " ]")
 		fmt.Println("")
-		fmt.Println("[" + utils.RedText("+") + "] [ " + utils.RedText("Total") + " ] > [ " + utils.RedText(fmt.Sprint(tempDomain.RequestsPerSecond)+" r/s") + " ]")
-		fmt.Println("[" + utils.RedText("+") + "] [ " + utils.RedText("Bypassed") + " ] > [ " + utils.RedText(fmt.Sprint(tempDomain.RequestsBypassedPerSecond)+" r/s") + " ]")
+		fmt.Println("[" + utils.RedText("+") + "] [ " + utils.RedText("Total") + " ] > [ " + utils.RedText(fmt.Sprint(domainData.RequestsPerSecond)+" r/s") + " ]")
+		fmt.Println("[" + utils.RedText("+") + "] [ " + utils.RedText("Bypassed") + " ] > [ " + utils.RedText(fmt.Sprint(domainData.RequestsBypassedPerSecond)+" r/s") + " ]")
 
 		fmt.Println("")
 		fmt.Println("[ " + utils.RedText("Latest Logs") + " ]")
 
-		for _, log := range tempDomain.LastLogs {
+		for _, log := range domainData.LastLogs {
 			if len(log)+4 > proxy.TWidth {
 				fmt.Println("[" + utils.RedText("+") + "] " + log[:len(log)-(len(log)+4-proxy.TWidth)] + " ...\033[0m")
 			} else {
@@ -189,8 +198,6 @@ func printStats() {
 	}
 
 	utils.MoveInputLine()
-
-	PrintMutex.Unlock()
 }
 
 func commands() {
@@ -205,16 +212,14 @@ func commands() {
 			input := scanner.Text()
 			details := strings.Split(input, " ")
 
-			domainVal, ok := domains.DomainsMap.Load(proxy.WatchedDomain)
-			tempDomain := domains.DomainSettings{}
-			if ok {
-				tempDomain = domainVal.(domains.DomainSettings)
-			}
+			firewall.Mutex.Lock()
+			domainData := domains.DomainsData[proxy.WatchedDomain]
+			firewall.Mutex.Unlock()
 
 			switch details[0] {
 			case "stage":
-				_, ok := domains.DomainsMap.Load(proxy.WatchedDomain)
-				if !ok {
+
+				if domainData.Stage == 0 {
 					break
 				}
 				if !(len(details) > 1) {
@@ -224,14 +229,22 @@ func commands() {
 				if err != nil {
 					break
 				}
-				tempDomain.Stage = int(setStage)
-				if tempDomain.Stage == 0 {
-					tempDomain.Stage = 1
-					tempDomain.StageManuallySet = false
+				stage := int(setStage)
+				if stage == 0 {
+					domainData.Stage = 1
+					domainData.StageManuallySet = false
+
+					firewall.Mutex.Lock()
+					domains.DomainsData[proxy.WatchedDomain] = domainData
+					firewall.Mutex.Unlock()
 				} else {
-					tempDomain.StageManuallySet = true
+					domainData.Stage = stage
+					domainData.StageManuallySet = true
+
+					firewall.Mutex.Lock()
+					domains.DomainsData[proxy.WatchedDomain] = domainData
+					firewall.Mutex.Unlock()
 				}
-				domains.DomainsMap.Store(proxy.WatchedDomain, tempDomain)
 			case "domain":
 				if len(details) < 2 {
 					proxy.WatchedDomain = ""
@@ -380,12 +393,7 @@ func reloadConfig() {
 		}
 
 		domains.DomainsMap.Store(domain.Name, domains.DomainSettings{
-			Name:             domain.Name,
-			Stage:            1,
-			StageManuallySet: false,
-			RawAttack:        false,
-			BypassAttack:     false,
-			LastLogs:         []string{},
+			Name: domain.Name,
 
 			CustomRules: firewallRules,
 			IPInfo:      ipInfo,
@@ -408,6 +416,15 @@ func reloadConfig() {
 			DisableRawStage3:    domain.DisableRawStage3,
 			DisableBypassStage2: domain.DisableBypassStage2,
 			DisableRawStage2:    domain.DisableRawStage2,
+		})
+
+		firewall.Mutex.Lock()
+		domains.DomainsData[domain.Name] = domains.DomainData{
+			Stage:            1,
+			StageManuallySet: false,
+			RawAttack:        false,
+			BypassAttack:     false,
+			LastLogs:         []string{},
 
 			TotalRequests:    0,
 			BypassedRequests: 0,
@@ -420,7 +437,8 @@ func reloadConfig() {
 			PeakRequestsPerSecond:         0,
 			PeakRequestsBypassedPerSecond: 0,
 			RequestLogger:                 []domains.RequestLog{},
-		})
+		}
+		firewall.Mutex.Unlock()
 	}
 
 	proxy.WatchedDomain = domains.Domains[0]

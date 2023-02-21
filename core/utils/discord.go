@@ -12,19 +12,19 @@ import (
 	quickchartgo "github.com/henomis/quickchart-go"
 )
 
-func InitPlaceholders(msg string, domain domains.DomainSettings) string {
-	msg = strings.ReplaceAll(msg, "{{domain.name}}", domain.Name)
-	msg = strings.ReplaceAll(msg, "{{attack.start}}", domain.RequestLogger[0].Time.Format("15:04:05"))
-	msg = strings.ReplaceAll(msg, "{{attack.end}}", domain.RequestLogger[len(domain.RequestLogger)-1].Time.Format("15:04:05"))
+func InitPlaceholders(msg string, domainData domains.DomainData, domain string) string {
+	msg = strings.ReplaceAll(msg, "{{domain.name}}", domain)
+	msg = strings.ReplaceAll(msg, "{{attack.start}}", domainData.RequestLogger[0].Time.Format("15:04:05"))
+	msg = strings.ReplaceAll(msg, "{{attack.end}}", domainData.RequestLogger[len(domainData.RequestLogger)-1].Time.Format("15:04:05"))
 	msg = strings.ReplaceAll(msg, "{{proxy.cpu}}", proxy.CpuUsage)
 	msg = strings.ReplaceAll(msg, "{{proxy.ram}}", proxy.RamUsage)
 
 	return msg
 }
 
-func SendWebhook(domain domains.DomainSettings, notificationType int) {
+func SendWebhook(domainData domains.DomainData, domainSettings domains.DomainSettings, notificationType int) {
 
-	if domain.DomainWebhooks.URL == "" {
+	if domainSettings.DomainWebhooks.URL == "" {
 		return
 	}
 
@@ -33,12 +33,12 @@ func SendWebhook(domain domains.DomainSettings, notificationType int) {
 	switch notificationType {
 	case 0:
 
-		description := InitPlaceholders(domain.DomainWebhooks.AttackStartMsg, domain)
+		description := InitPlaceholders(domainSettings.DomainWebhooks.AttackStartMsg, domainData, domainSettings.Name)
 
 		webhookContent = Webhook{
 			Content:  "",
-			Username: domain.DomainWebhooks.Name,
-			Avatar:   domain.DomainWebhooks.Avatar,
+			Username: domainSettings.DomainWebhooks.Name,
+			Avatar:   domainSettings.DomainWebhooks.Avatar,
 			Embeds: []WebhookEmbed{
 				{
 					Title:       "DDoS Alert",
@@ -47,11 +47,11 @@ func SendWebhook(domain domains.DomainSettings, notificationType int) {
 					Fields: []WebhookField{
 						{
 							Name:  "Total requests per second",
-							Value: "```\n" + fmt.Sprint(domain.RequestsPerSecond) + "\n```",
+							Value: "```\n" + fmt.Sprint(domainData.RequestsPerSecond) + "\n```",
 						},
 						{
 							Name:  "Allowed requests per second",
-							Value: "```\n" + fmt.Sprint(domain.RequestsBypassedPerSecond) + "\n```",
+							Value: "```\n" + fmt.Sprint(domainData.RequestsBypassedPerSecond) + "\n```",
 						},
 					},
 				},
@@ -59,8 +59,8 @@ func SendWebhook(domain domains.DomainSettings, notificationType int) {
 		}
 	case 1:
 
-		description := InitPlaceholders(domain.DomainWebhooks.AttackStopMsg, domain)
-		requests := domain.RequestLogger
+		description := InitPlaceholders(domainSettings.DomainWebhooks.AttackStopMsg, domainData, domainSettings.Name)
+		requests := domainData.RequestLogger
 
 		allowedData := ""
 		totalData := ""
@@ -206,8 +206,8 @@ func SendWebhook(domain domains.DomainSettings, notificationType int) {
 		if chartErr == nil {
 			webhookContent = Webhook{
 				Content:  "",
-				Username: domain.DomainWebhooks.Name,
-				Avatar:   domain.DomainWebhooks.Avatar,
+				Username: domainSettings.DomainWebhooks.Name,
+				Avatar:   domainSettings.DomainWebhooks.Avatar,
 				Embeds: []WebhookEmbed{
 					{
 						Title:       "DDoS Alert",
@@ -216,11 +216,11 @@ func SendWebhook(domain domains.DomainSettings, notificationType int) {
 						Fields: []WebhookField{
 							{
 								Name:  "Peak total requests per second",
-								Value: "```\n" + fmt.Sprint(domain.PeakRequestsPerSecond) + "\n```",
+								Value: "```\n" + fmt.Sprint(domainData.PeakRequestsPerSecond) + "\n```",
 							},
 							{
 								Name:  "Peak allowed requests per second",
-								Value: "```\n" + fmt.Sprint(domain.PeakRequestsBypassedPerSecond) + "\n```",
+								Value: "```\n" + fmt.Sprint(domainData.PeakRequestsBypassedPerSecond) + "\n```",
 							},
 						},
 						Image: WebhookImage{
@@ -230,12 +230,6 @@ func SendWebhook(domain domains.DomainSettings, notificationType int) {
 				},
 			}
 		}
-
-		domain.PeakRequestsPerSecond = 0
-		domain.PeakRequestsBypassedPerSecond = 0
-		domain.RequestLogger = []domains.RequestLog{}
-
-		domains.DomainsMap.Store(domain.Name, domain)
 	}
 
 	webhookPayload, err := json.Marshal(webhookContent)
@@ -243,7 +237,7 @@ func SendWebhook(domain domains.DomainSettings, notificationType int) {
 		return
 	}
 
-	req, err := http.NewRequest("POST", domain.DomainWebhooks.URL, bytes.NewBuffer(webhookPayload))
+	req, err := http.NewRequest("POST", domainSettings.DomainWebhooks.URL, bytes.NewBuffer(webhookPayload))
 	if err != nil {
 		return
 	}

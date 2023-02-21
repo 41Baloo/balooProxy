@@ -65,7 +65,7 @@ func Load() {
 	proxy.FailChallengeRatelimit = domains.Config.Proxy.Ratelimits["challengeFailures"]
 	proxy.FailRequestRatelimit = domains.Config.Proxy.Ratelimits["noRequestsSent"]
 
-	GetFingerprints("https://raw.githubusercontent.com/41Baloo/balooProxy/main/global/fingerprints/known_fingerprints.json", &firewall.KnwonFingerprints)
+	GetFingerprints("https://raw.githubusercontent.com/41Baloo/balooProxy/main/global/fingerprints/known_fingerprints.json", &firewall.KnownFingerprints)
 	GetFingerprints("https://raw.githubusercontent.com/41Baloo/balooProxy/main/global/fingerprints/bot_fingerprints.json", &firewall.BotFingerprints)
 	GetFingerprints("https://raw.githubusercontent.com/41Baloo/balooProxy/main/global/fingerprints/malicious_fingerprints.json", &firewall.ForbiddenFingerprints)
 
@@ -122,12 +122,7 @@ func Load() {
 		}
 
 		domains.DomainsMap.Store(domain.Name, domains.DomainSettings{
-			Name:             domain.Name,
-			Stage:            1,
-			StageManuallySet: false,
-			RawAttack:        false,
-			BypassAttack:     false,
-			LastLogs:         []string{},
+			Name: domain.Name,
 
 			CustomRules:    firewallRules,
 			IPInfo:         ipInfo,
@@ -152,6 +147,15 @@ func Load() {
 			DisableRawStage3:    domain.DisableRawStage3,
 			DisableBypassStage2: domain.DisableBypassStage2,
 			DisableRawStage2:    domain.DisableRawStage2,
+		})
+
+		firewall.Mutex.Lock()
+		domains.DomainsData[domain.Name] = domains.DomainData{
+			Stage:            1,
+			StageManuallySet: false,
+			RawAttack:        false,
+			BypassAttack:     false,
+			LastLogs:         []string{},
 
 			TotalRequests:    0,
 			BypassedRequests: 0,
@@ -164,7 +168,8 @@ func Load() {
 			PeakRequestsPerSecond:         0,
 			PeakRequestsBypassedPerSecond: 0,
 			RequestLogger:                 []domains.RequestLog{},
-		})
+		}
+		firewall.Mutex.Unlock()
 	}
 
 	if len(domains.Domains) == 0 {

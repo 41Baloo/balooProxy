@@ -58,15 +58,22 @@ func Serve() {
 		}
 
 		service.Handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			domainVal, ok := domains.DomainsMap.Load(r.Host)
-			if !ok {
+			firewall.Mutex.Lock()
+			domainData := domains.DomainsData[r.Host]
+			firewall.Mutex.Unlock()
+
+			if domainData.Stage == 0 {
 				w.Header().Set("Content-Type", "text/plain")
 				fmt.Fprintf(w, "balooProxy: "+r.Host+" does not exist. If you are the owner please check your config.json if you believe this is a mistake")
 				return
 			}
-			tempDomain := domainVal.(domains.DomainSettings)
-			tempDomain.TotalRequests = tempDomain.TotalRequests + 1
-			domains.DomainsMap.Store(r.Host, tempDomain)
+
+			firewall.Mutex.Lock()
+			domainData = domains.DomainsData[r.Host]
+			domainData.TotalRequests++
+			domains.DomainsData[r.Host] = domainData
+			firewall.Mutex.Unlock()
+
 			http.Redirect(w, r, "https://"+r.Host+r.URL.Path+r.URL.RawQuery, http.StatusMovedPermanently)
 		})
 		service.SetKeepAlivesEnabled(false)

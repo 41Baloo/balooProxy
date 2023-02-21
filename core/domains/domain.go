@@ -13,6 +13,7 @@ import (
 var (
 	Domains      = []string{}
 	DomainsMap   sync.Map
+	DomainsData  = map[string]DomainData{}
 	DomainsCache sync.Map
 	Config       *Configuration
 )
@@ -40,12 +41,7 @@ type Domain struct {
 }
 
 type DomainSettings struct {
-	Name             string
-	Stage            int
-	StageManuallySet bool
-	RawAttack        bool
-	BypassAttack     bool
-	LastLogs         []string
+	Name string
 
 	CustomRules    []Rule
 	IPInfo         bool
@@ -64,6 +60,14 @@ type DomainSettings struct {
 	DisableRawStage3    int
 	DisableBypassStage2 int
 	DisableRawStage2    int
+}
+
+type DomainData struct {
+	Stage            int
+	StageManuallySet bool
+	RawAttack        bool
+	BypassAttack     bool
+	LastLogs         []string
 
 	TotalRequests    int
 	BypassedRequests int

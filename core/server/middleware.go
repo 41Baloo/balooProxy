@@ -26,14 +26,15 @@ import (
 func Middleware(writer http.ResponseWriter, request *http.Request) {
 	domainName := request.Host
 
-	domain, ok := domains.Get(domainName)
-	if ok != nil {
+	firewall.Mutex.Lock()
+	domainData := domains.DomainsData[domainName]
+	firewall.Mutex.Unlock()
+
+	if domainData.Stage == 0 {
 		writer.Header().Set("Content-Type", "text/plain")
 		fmt.Fprintf(writer, "balooProxy: "+domainName+" does not exist. If you are the owner please check your config.json if you believe this is a mistake")
 		return
 	}
-
-	domain.TotalRequests++
 
 	var ip string
 	var tlsFp string
@@ -62,25 +63,32 @@ func Middleware(writer http.ResponseWriter, request *http.Request) {
 		//Retrieve information about the client
 		firewall.Mutex.Lock()
 		tlsFp = firewall.Connections[request.RemoteAddr]
-		browser = firewall.KnwonFingerprints[tlsFp]
-		botFp = firewall.BotFingerprints[tlsFp]
 
 		fpCount = firewall.UnkFps[tlsFp]
 		ipCount = firewall.AccessIps[ip]
 		ipCountCookie = firewall.AccessIpsCookie[ip]
 		firewall.Mutex.Unlock()
+
+		//Read-Only IMPORTANT: Must be put in mutex if you add the ability to change indexed fingerprints while program is running
+		browser = firewall.KnownFingerprints[tlsFp]
+		botFp = firewall.BotFingerprints[tlsFp]
 	}
 
 	writer.Header().Set("baloo-Proxy", "1.2")
 
 	//Start the suspicious level where the stage currently is
-	susLv := domain.Stage
+	susLv := domainData.Stage
 
 	//Ratelimit faster if client repeatedly fails the verification challenge (feel free to play around with the threshhold)
 	if ipCountCookie > proxy.FailChallengeRatelimit {
 		writer.Header().Set("Content-Type", "text/plain")
 		fmt.Fprintf(writer, "Blocked by BalooProxy.\nYou have been ratelimited. (R1)")
-		domains.DomainsMap.Store(domainName, domain)
+
+		firewall.Mutex.Lock()
+		domainData = domains.DomainsData[domainName]
+		domainData.TotalRequests++
+		domains.DomainsData[domainName] = domainData
+		firewall.Mutex.Unlock()
 		return
 	}
 
@@ -88,7 +96,12 @@ func Middleware(writer http.ResponseWriter, request *http.Request) {
 	if ipCount > proxy.IPRatelimit {
 		writer.Header().Set("Content-Type", "text/plain")
 		fmt.Fprintf(writer, "Blocked by BalooProxy.\nYou have been ratelimited. (R2)")
-		domains.DomainsMap.Store(domainName, domain)
+
+		firewall.Mutex.Lock()
+		domainData = domains.DomainsData[domainName]
+		domainData.TotalRequests++
+		domains.DomainsData[domainName] = domainData
+		firewall.Mutex.Unlock()
 		return
 	}
 
@@ -97,7 +110,12 @@ func Middleware(writer http.ResponseWriter, request *http.Request) {
 		if fpCount > proxy.FPRatelimit {
 			writer.Header().Set("Content-Type", "text/plain")
 			fmt.Fprintf(writer, "Blocked by BalooProxy.\nYou have been ratelimited. (R3)")
-			domains.DomainsMap.Store(domainName, domain)
+
+			firewall.Mutex.Lock()
+			domainData = domains.DomainsData[domainName]
+			domainData.TotalRequests++
+			domains.DomainsData[domainName] = domainData
+			firewall.Mutex.Unlock()
 			return
 		}
 
@@ -107,21 +125,27 @@ func Middleware(writer http.ResponseWriter, request *http.Request) {
 	}
 
 	//Block user-specified fingerprints
-	firewall.Mutex.Lock()
 	forbiddenFp := firewall.ForbiddenFingerprints[tlsFp]
-	firewall.Mutex.Unlock()
 	if forbiddenFp != "" {
 		writer.Header().Set("Content-Type", "text/plain")
 		fmt.Fprintf(writer, "Blocked by BalooProxy.\nYour browser %s is not allowed.", forbiddenFp)
-		domains.DomainsMap.Store(domainName, domain)
+
+		firewall.Mutex.Lock()
+		domainData = domains.DomainsData[domainName]
+		domainData.TotalRequests++
+		domains.DomainsData[domainName] = domainData
+		firewall.Mutex.Unlock()
 		return
 	}
 
 	//Demonstration of how to use "susLv". Essentially allows you to challenge specific requests with a higher challenge
 
+	settingsQuery, _ := domains.DomainsMap.Load(domainName)
+	domainSettings := settingsQuery.(domains.DomainSettings)
+
 	ipInfoCountry := "N/A"
 	ipInfoASN := "N/A"
-	if domain.IPInfo {
+	if domainSettings.IPInfo {
 		ipInfoCountry, ipInfoASN = utils.GetIpInfo(ip)
 	}
 
@@ -145,16 +169,16 @@ func Middleware(writer http.ResponseWriter, request *http.Request) {
 		"http.cookie":    request.Header.Get("Cookie"),
 		"http.headers":   fmt.Sprint(request.Header),
 
-		"proxy.stage":         domain.Stage,
+		"proxy.stage":         domainData.Stage,
 		"proxy.cloudflare":    domains.Config.Proxy.Cloudflare,
-		"proxy.stage_locked":  domain.StageManuallySet,
-		"proxy.attack":        domain.RawAttack,
-		"proxy.bypass_attack": domain.BypassAttack,
-		"proxy.rps":           domain.RequestsPerSecond,
-		"proxy.rpsAllowed":    domain.RequestsBypassedPerSecond,
+		"proxy.stage_locked":  domainData.StageManuallySet,
+		"proxy.attack":        domainData.RawAttack,
+		"proxy.bypass_attack": domainData.BypassAttack,
+		"proxy.rps":           domainData.RequestsPerSecond,
+		"proxy.rpsAllowed":    domainData.RequestsBypassedPerSecond,
 	}
 
-	susLv = firewall.EvalFirewallRule(domain, requestVariables, susLv)
+	susLv = firewall.EvalFirewallRule(domainSettings, requestVariables, susLv)
 
 	//Check if encryption-result is already "cached" to prevent load on reverse proxy
 	firewall.Mutex.Lock()
@@ -174,8 +198,13 @@ func Middleware(writer http.ResponseWriter, request *http.Request) {
 			encryptedIP = utils.Encrypt(ip+tlsFp+fmt.Sprint(hr), proxy.CaptchaOTP)
 		default:
 			writer.Header().Set("Content-Type", "text/plain")
-			fmt.Fprintf(writer, "Blocked by BalooProxy.\nSuspicious request of level %d (base %d)", susLv, domain.Stage)
-			domains.DomainsMap.Store(domainName, domain)
+			fmt.Fprintf(writer, "Blocked by BalooProxy.\nSuspicious request of level %d (base %d)", susLv, domainData.Stage)
+
+			firewall.Mutex.Lock()
+			domainData = domains.DomainsData[domainName]
+			domainData.TotalRequests++
+			domains.DomainsData[domainName] = domainData
+			firewall.Mutex.Unlock()
 			return
 		}
 		firewall.Mutex.Lock()
@@ -197,12 +226,22 @@ func Middleware(writer http.ResponseWriter, request *http.Request) {
 		case 1:
 			writer.Header().Set("Set-Cookie", "_1__bProxy_v="+encryptedIP+"; SameSite=None; path=/; Secure")
 			http.Redirect(writer, request, request.URL.RequestURI(), http.StatusTemporaryRedirect)
-			domains.DomainsMap.Store(domainName, domain)
+
+			firewall.Mutex.Lock()
+			domainData = domains.DomainsData[domainName]
+			domainData.TotalRequests++
+			domains.DomainsData[domainName] = domainData
+			firewall.Mutex.Unlock()
 			return
 		case 2:
 			writer.Header().Set("Content-Type", "text/html")
-			fmt.Fprintf(writer, `<script>document.cookie = '_2__bProxy_v=%s; SameSite=None; path=/; Secure';windowriter.location.reload();</script>`, encryptedIP)
-			domains.DomainsMap.Store(domainName, domain)
+			fmt.Fprintf(writer, `<script>document.cookie = '_2__bProxy_v=%s; SameSite=None; path=/; Secure';window.location.reload();</script>`, encryptedIP)
+
+			firewall.Mutex.Lock()
+			domainData = domains.DomainsData[domainName]
+			domainData.TotalRequests++
+			domains.DomainsData[domainName] = domainData
+			firewall.Mutex.Unlock()
 			return
 		case 3:
 			secretPart := encryptedIP[:6]
@@ -229,7 +268,12 @@ func Middleware(writer http.ResponseWriter, request *http.Request) {
 				var buf bytes.Buffer
 				if err := png.Encode(&buf, captchaImg); err != nil {
 					fmt.Fprintf(writer, `BalooProxy Error: Failed to encode captcha: %s`, err)
-					domains.DomainsMap.Store(domainName, domain)
+
+					firewall.Mutex.Lock()
+					domainData = domains.DomainsData[domainName]
+					domainData.TotalRequests++
+					domains.DomainsData[domainName] = domainData
+					firewall.Mutex.Unlock()
 					return
 				}
 				data := buf.Bytes()
@@ -467,12 +511,20 @@ func Middleware(writer http.ResponseWriter, request *http.Request) {
 					}
 					</script>
 					`, captchaData, ip, publicPart)
-			domains.DomainsMap.Store(domainName, domain)
+			firewall.Mutex.Lock()
+			domainData = domains.DomainsData[domainName]
+			domainData.TotalRequests++
+			domains.DomainsData[domainName] = domainData
+			firewall.Mutex.Unlock()
 			return
 		default:
 			writer.Header().Set("Content-Type", "text/plain")
-			fmt.Fprintf(writer, "Blocked by BalooProxy.\nSuspicious request of level %d (base %d)", susLv, domain.Stage)
-			domains.DomainsMap.Store(domainName, domain)
+			fmt.Fprintf(writer, "Blocked by BalooProxy.\nSuspicious request of level %d (base %d)", susLv, domainData.Stage)
+			firewall.Mutex.Lock()
+			domainData = domains.DomainsData[domainName]
+			domainData.TotalRequests++
+			domains.DomainsData[domainName] = domainData
+			firewall.Mutex.Unlock()
 			return
 		}
 	}
@@ -480,46 +532,49 @@ func Middleware(writer http.ResponseWriter, request *http.Request) {
 	//Access logs of clients that passed the challenge
 	if browser != "" || botFp != "" {
 		access := "[ " + utils.RedText(time.Now().Format("15:04:05")) + " ] > \033[35m" + ip + "\033[0m - \033[32m" + browser + botFp + "\033[0m - " + utils.RedText(request.UserAgent()) + " - " + utils.RedText(request.RequestURI)
-		domain = utils.AddLogs(access, domain)
 		firewall.Mutex.Lock()
+		domainData = utils.AddLogs(access, domainName)
 		firewall.AccessIps[ip] = firewall.AccessIps[ip] + 1
 		firewall.Mutex.Unlock()
 	} else {
 		access := "[ " + utils.RedText(time.Now().Format("15:04:05")) + " ] > \033[35m" + ip + "\033[0m - \033[31mUNK (" + tlsFp + ")\033[0m - " + utils.RedText(request.UserAgent()) + " - " + utils.RedText(request.RequestURI)
-		domain = utils.AddLogs(access, domain)
 		firewall.Mutex.Lock()
+		domainData = utils.AddLogs(access, domainName)
 		firewall.AccessIps[ip] = firewall.AccessIps[ip] + 1
 		firewall.Mutex.Unlock()
 	}
 
-	domain.BypassedRequests++
-
 	ctx := context.WithValue(request.Context(), "filter", requestVariables)
 	request = request.WithContext(ctx)
-	ctx = context.WithValue(request.Context(), "domain", domain)
+	ctx = context.WithValue(request.Context(), "domain", domainSettings)
 	request = request.WithContext(ctx)
+
+	firewall.Mutex.Lock()
+	domainData = domains.DomainsData[domainName]
+	domainData.TotalRequests++
+	domainData.BypassedRequests++
+	domains.DomainsData[domainName] = domainData
+	firewall.Mutex.Unlock()
 
 	//Reserved proxy-paths
 	switch request.URL.Path {
 	case "/_bProxy/stats":
 		writer.Header().Set("Content-Type", "text/plain")
-		fmt.Fprintf(writer, "Stage: %s\nTotal Requests: %s\nBypassed Requests: %s\nTotal R/s: %s\nBypassed R/s: %s", fmt.Sprint(domain.Stage), fmt.Sprint(domain.TotalRequests), fmt.Sprint(domain.BypassedRequests), fmt.Sprint(domain.RequestsPerSecond), fmt.Sprint(domain.RequestsBypassedPerSecond))
-		domains.DomainsMap.Store(domainName, domain)
+		fmt.Fprintf(writer, "Stage: %s\nTotal Requests: %s\nBypassed Requests: %s\nTotal R/s: %s\nBypassed R/s: %s", fmt.Sprint(domainData.Stage), fmt.Sprint(domainData.TotalRequests), fmt.Sprint(domainData.BypassedRequests), fmt.Sprint(domainData.RequestsPerSecond), fmt.Sprint(domainData.RequestsBypassedPerSecond))
 		return
 	case "/_bProxy/fingerprint":
 		writer.Header().Set("Content-Type", "text/plain")
+
 		firewall.Mutex.Lock()
 		fmt.Fprintf(writer, "IP: "+ip+"\nASN: "+fmt.Sprint(ipInfoASN)+"\nCountry: "+ipInfoCountry+"\nIP Requests: "+fmt.Sprint(ipCount)+"\nIP Challenge Requests: "+fmt.Sprint(firewall.AccessIpsCookie[ip])+"\nSusLV: "+fmt.Sprint(susLv)+"\nFingerprint: "+tlsFp+"\nBrowser: "+browser+botFp)
 		firewall.Mutex.Unlock()
-		domains.DomainsMap.Store(domainName, domain)
 		return
 	case "/_bProxy/verified":
 		writer.Header().Set("Content-Type", "text/plain")
 		fmt.Fprintf(writer, "verified")
-		domains.DomainsMap.Store(domainName, domain)
 		return
 	case "/_bProxy/" + proxy.AdminSecret + "/api/v1":
-		result := api.Process(writer, request, domain)
+		result := api.Process(writer, request, domainData)
 		if result {
 			return
 		}
@@ -527,7 +582,6 @@ func Middleware(writer http.ResponseWriter, request *http.Request) {
 	case "/_bProxy/credits":
 		writer.Header().Set("Content-Type", "text/plain")
 		fmt.Fprintf(writer, "BalooProxy; Lightweight http reverse-proxy https://github.com/41Baloo/balooProxy. Protected by GNU GENERAL PUBLIC LICENSE Version 2, June 1991")
-		domains.DomainsMap.Store(domainName, domain)
 		return
 	}
 
@@ -537,7 +591,5 @@ func Middleware(writer http.ResponseWriter, request *http.Request) {
 	request.Header.Add("proxy-tls-fp", tlsFp)
 	request.Header.Add("proxy-tls-name", browser+botFp)
 
-	domains.DomainsMap.Store(domainName, domain)
-
-	domain.DomainProxy.ServeHTTP(writer, request)
+	domainSettings.DomainProxy.ServeHTTP(writer, request)
 }
