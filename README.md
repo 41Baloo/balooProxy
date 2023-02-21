@@ -2,21 +2,43 @@
 
 ## **TLS-Fingerprinting**
 
+`TLS Fingerprinting` opens a whole new world of possibilities to defend against malicious attacks.
+
+On one hand you can use `tls fingerprinting` to `whitelist` specific fingerprints, take for example seo bots, `blacklist` unwanted fingerprints, like for example wordpress exploit crawlers, ratelimit attackers that use proxies to change their ips or just simply gain more information about a visitor
+
 ## **Staged DDoS-Mitigation**
 
-### **Cookie Challenge
+balooProxy comes with `3 distinct challenges`, in order to defend against bots/ddos attacks effectively, whilst effecting an actual users experience as little as possible. In order to archive that, balooProxy starts with the "weakest" and least notable challenge and automatically changes them when it detects one of them is being bypassed
 
-### **Invisible JS Challenge
+### **Cookie Challenge**
+
+The cookie challenge is completely invisible and supported by every webbrowser, aswell as most http libraries. It is an effective method to defend against simple ddos attacks
+
+### **Invisible JS Challenge**
+
+The invisible js challenge allows you to reliably block slightly more advanced bots while impacting the user experience as little as possible 
 
 ### **Custom Captcha**
+
+The custom captcha should be your last resort or be used to protect especially weak webpages.
+
+![Custom Captcha](https://cdn.discordapp.com/attachments/847520565606613042/1061764715577098250/image.png)
 
 ## **DDoS Alerts**
 
 Always be informed when you are under attack of a (D)DoS attack with customisable discord alerts.
 
+![Discord Attack Alerts](https://cdn.discordapp.com/attachments/1055573537148108941/1077581121832878140/image.png)
 
+For more information on how to customise discord alerts refeer to 
 
 ## **Lightweight**
+
+balooProxy tries to be as lightweight as possible, in order to run smoothly for everyone. Everything has its limits tho.
+
+## **Cloudflare Mode**
+
+Not everyone can afford expensive servers, aswell as a global cdn and this is fine. That's why balooProxy supports being used along with cloudflare, although this comes at the cost of a few features, like `tls fingerprinting`.
 
 # **Installation**
 
@@ -82,10 +104,29 @@ Path to your ssl certificate (For example `server.crt` or `/certificates/example
 
 Path to your ssl private key (For example `server.key` or `/keys/example.com.key`)
 
-### **Rules**
+### `webhook` <sup>Map[String]String</sup>
+
+This field allows you to customise/enable discord DDoS alert notifications. It should be noted, discord alerts only get sent when the stage is **not** locked aswell as only when the first stage is bypassed and when the attack ended.
+
+**`url`**: The webhook url the alert should be sent to. Refer to [Discords Introduction To Webhooks](https://support.discord.com/hc/en-us/articles/228383668-Intro-to-Webhooks) for more information.
+
+**`name`**: The name your alert should have displayed above it in discord
+
+**`avatar`**: Url to the profile picture your alert should have inside discord
+
+**`attack_start_msg`**: The message the alert should send when your domain is first under attack. Notice: you can use placeholders, like `{{domain.name}}`, `{{attack.start}}`, `{{attack.end}}`, `{{proxy.cpu}}` and `{{proxy.ram}}` here
+
+**`attack_end_msg`**: The message the alert should send when your domain is no longer under attack. Notice: you can use placeholders, like `{{domain.name}}`, `{{attack.start}}`, `{{attack.end}}`, `{{proxy.cpu}}` and `{{proxy.ram}}` here
+
+### **Firewall Rules**
 ---
 
 Refer to [Custom Firewall Rules](#Custom-Firewall-Rules)
+
+### **Cache Rules**
+---
+
+Refer to [Custom Cache Rules](#Custom-cache-rules)
 
 # **Custom Firewall Rules**
 
@@ -412,6 +453,7 @@ Use `Query` as cache-key. The same `Query` for different `Paths`/`Methods` will 
 
 Use `IP` as cache-key. The same `IP` will always get the same result
 
+
 # **Terminal**
 
 ## **Main Hud**
@@ -452,6 +494,10 @@ Shows information about the last requests that passed balooProxy (The amount can
 
 The terminal allows you to input commands which change the behaviour of balooProxy
 
+### `rtlogs`
+
+The command `rtlogs` enables "real time logs", meaning the terminal log will not, like usually, update every second with the latest logs but will instead instantly update, as soon as there is another request to log. Notice, this might require a lot of cpu when your proxy is getting attacked
+
 ### `add`
 
 The command `add` prompts you with questions to add another domain to your proxy (**Note**: This can be done in the config.json aswell, however that currently requires your proxy to restart to apply the changes)
@@ -464,3 +510,7 @@ The command `domain` followed by the name of a domain allows you to switch betwe
 
 The command `stage` followed by a number will set the proxies stage to said number
 (**Note**: Setting the `stage` manually means the proxy will remain in that `stage` no matter what. Even if an attack is ongoing that bypasses this `stage`. Setting your `stage` to `0` will set the `stage` to 1 and enable automatic stage-switching again. Setting the `stage` to a number higher than `3` will result in all requests getting blocked)
+
+### `delcache`
+
+The command `delcache` allows you to instantly clear the cache of the domain you are currently watching
