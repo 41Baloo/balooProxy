@@ -74,6 +74,12 @@ func Middleware(writer http.ResponseWriter, request *http.Request) {
 		botFp = firewall.BotFingerprints[tlsFp]
 	}
 
+	firewall.Mutex.Lock()
+	domainData = domains.DomainsData[domainName]
+	domainData.TotalRequests++
+	domains.DomainsData[domainName] = domainData
+	firewall.Mutex.Unlock()
+
 	writer.Header().Set("baloo-Proxy", "1.2")
 
 	//Start the suspicious level where the stage currently is
@@ -83,12 +89,6 @@ func Middleware(writer http.ResponseWriter, request *http.Request) {
 	if ipCountCookie > proxy.FailChallengeRatelimit {
 		writer.Header().Set("Content-Type", "text/plain")
 		fmt.Fprintf(writer, "Blocked by BalooProxy.\nYou have been ratelimited. (R1)")
-
-		firewall.Mutex.Lock()
-		domainData = domains.DomainsData[domainName]
-		domainData.TotalRequests++
-		domains.DomainsData[domainName] = domainData
-		firewall.Mutex.Unlock()
 		return
 	}
 
@@ -96,12 +96,6 @@ func Middleware(writer http.ResponseWriter, request *http.Request) {
 	if ipCount > proxy.IPRatelimit {
 		writer.Header().Set("Content-Type", "text/plain")
 		fmt.Fprintf(writer, "Blocked by BalooProxy.\nYou have been ratelimited. (R2)")
-
-		firewall.Mutex.Lock()
-		domainData = domains.DomainsData[domainName]
-		domainData.TotalRequests++
-		domains.DomainsData[domainName] = domainData
-		firewall.Mutex.Unlock()
 		return
 	}
 
@@ -110,12 +104,6 @@ func Middleware(writer http.ResponseWriter, request *http.Request) {
 		if fpCount > proxy.FPRatelimit {
 			writer.Header().Set("Content-Type", "text/plain")
 			fmt.Fprintf(writer, "Blocked by BalooProxy.\nYou have been ratelimited. (R3)")
-
-			firewall.Mutex.Lock()
-			domainData = domains.DomainsData[domainName]
-			domainData.TotalRequests++
-			domains.DomainsData[domainName] = domainData
-			firewall.Mutex.Unlock()
 			return
 		}
 
@@ -129,12 +117,6 @@ func Middleware(writer http.ResponseWriter, request *http.Request) {
 	if forbiddenFp != "" {
 		writer.Header().Set("Content-Type", "text/plain")
 		fmt.Fprintf(writer, "Blocked by BalooProxy.\nYour browser %s is not allowed.", forbiddenFp)
-
-		firewall.Mutex.Lock()
-		domainData = domains.DomainsData[domainName]
-		domainData.TotalRequests++
-		domains.DomainsData[domainName] = domainData
-		firewall.Mutex.Unlock()
 		return
 	}
 
@@ -199,12 +181,6 @@ func Middleware(writer http.ResponseWriter, request *http.Request) {
 		default:
 			writer.Header().Set("Content-Type", "text/plain")
 			fmt.Fprintf(writer, "Blocked by BalooProxy.\nSuspicious request of level %d (base %d)", susLv, domainData.Stage)
-
-			firewall.Mutex.Lock()
-			domainData = domains.DomainsData[domainName]
-			domainData.TotalRequests++
-			domains.DomainsData[domainName] = domainData
-			firewall.Mutex.Unlock()
 			return
 		}
 		firewall.Mutex.Lock()
@@ -226,22 +202,10 @@ func Middleware(writer http.ResponseWriter, request *http.Request) {
 		case 1:
 			writer.Header().Set("Set-Cookie", "_1__bProxy_v="+encryptedIP+"; SameSite=None; path=/; Secure")
 			http.Redirect(writer, request, request.URL.RequestURI(), http.StatusTemporaryRedirect)
-
-			firewall.Mutex.Lock()
-			domainData = domains.DomainsData[domainName]
-			domainData.TotalRequests++
-			domains.DomainsData[domainName] = domainData
-			firewall.Mutex.Unlock()
 			return
 		case 2:
 			writer.Header().Set("Content-Type", "text/html")
 			fmt.Fprintf(writer, `<script>document.cookie = '_2__bProxy_v=%s; SameSite=None; path=/; Secure';window.location.reload();</script>`, encryptedIP)
-
-			firewall.Mutex.Lock()
-			domainData = domains.DomainsData[domainName]
-			domainData.TotalRequests++
-			domains.DomainsData[domainName] = domainData
-			firewall.Mutex.Unlock()
 			return
 		case 3:
 			secretPart := encryptedIP[:6]
@@ -268,12 +232,6 @@ func Middleware(writer http.ResponseWriter, request *http.Request) {
 				var buf bytes.Buffer
 				if err := png.Encode(&buf, captchaImg); err != nil {
 					fmt.Fprintf(writer, `BalooProxy Error: Failed to encode captcha: %s`, err)
-
-					firewall.Mutex.Lock()
-					domainData = domains.DomainsData[domainName]
-					domainData.TotalRequests++
-					domains.DomainsData[domainName] = domainData
-					firewall.Mutex.Unlock()
 					return
 				}
 				data := buf.Bytes()
@@ -511,20 +469,10 @@ func Middleware(writer http.ResponseWriter, request *http.Request) {
 					}
 					</script>
 					`, captchaData, ip, publicPart)
-			firewall.Mutex.Lock()
-			domainData = domains.DomainsData[domainName]
-			domainData.TotalRequests++
-			domains.DomainsData[domainName] = domainData
-			firewall.Mutex.Unlock()
 			return
 		default:
 			writer.Header().Set("Content-Type", "text/plain")
 			fmt.Fprintf(writer, "Blocked by BalooProxy.\nSuspicious request of level %d (base %d)", susLv, domainData.Stage)
-			firewall.Mutex.Lock()
-			domainData = domains.DomainsData[domainName]
-			domainData.TotalRequests++
-			domains.DomainsData[domainName] = domainData
-			firewall.Mutex.Unlock()
 			return
 		}
 	}
@@ -551,7 +499,6 @@ func Middleware(writer http.ResponseWriter, request *http.Request) {
 
 	firewall.Mutex.Lock()
 	domainData = domains.DomainsData[domainName]
-	domainData.TotalRequests++
 	domainData.BypassedRequests++
 	domains.DomainsData[domainName] = domainData
 	firewall.Mutex.Unlock()
