@@ -163,8 +163,8 @@ func Middleware(writer http.ResponseWriter, request *http.Request) {
 	susLv = firewall.EvalFirewallRule(domainSettings, requestVariables, susLv)
 
 	//Check if encryption-result is already "cached" to prevent load on reverse proxy
+	encryptedIP := ""
 	encryptedCache, encryptedExists := firewall.CacheIps.Load(ip + fmt.Sprint(susLv))
-	encryptedIP := encryptedCache.(string)
 
 	if !encryptedExists {
 		hr, _, _ := time.Now().Clock()
@@ -183,6 +183,8 @@ func Middleware(writer http.ResponseWriter, request *http.Request) {
 			return
 		}
 		firewall.CacheIps.Store(ip+fmt.Sprint(susLv), encryptedIP)
+	} else {
+		encryptedIP = encryptedCache.(string)
 	}
 
 	//Check if client provided correct verification result
@@ -208,8 +210,8 @@ func Middleware(writer http.ResponseWriter, request *http.Request) {
 			secretPart := encryptedIP[:6]
 			publicPart := encryptedIP[6:]
 
+			captchaData := ""
 			captchaCache, captchaExists := firewall.CacheImgs.Load(secretPart)
-			captchaData := captchaCache.(string)
 
 			if !captchaExists {
 				captchaImg := image.NewRGBA(image.Rect(0, 0, 100, 37))
@@ -235,6 +237,8 @@ func Middleware(writer http.ResponseWriter, request *http.Request) {
 				captchaData = base64.StdEncoding.EncodeToString(data)
 
 				firewall.CacheImgs.Store(secretPart, captchaData)
+			} else {
+				captchaData = captchaCache.(string)
 			}
 
 			writer.Header().Set("Content-Type", "text/html")
