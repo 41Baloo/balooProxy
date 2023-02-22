@@ -460,12 +460,14 @@ func clearProxyCache() {
 		for ipCookie := range firewall.AccessIpsCookie {
 			delete(firewall.AccessIpsCookie, ipCookie)
 		}
-		for cacheIp := range firewall.CacheIps {
-			delete(firewall.CacheIps, cacheIp)
-		}
-		for cacheImg := range firewall.CacheImgs {
-			delete(firewall.CacheImgs, cacheImg)
-		}
+		firewall.CacheIps.Range(func(key, value any) bool {
+			firewall.CacheIps.Delete(key)
+			return true
+		})
+		firewall.CacheImgs.Range(func(key, value any) bool {
+			firewall.CacheImgs.Delete(key)
+			return true
+		})
 		firewall.Mutex.Unlock()
 		time.Sleep(2 * time.Minute)
 	}

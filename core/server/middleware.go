@@ -163,11 +163,10 @@ func Middleware(writer http.ResponseWriter, request *http.Request) {
 	susLv = firewall.EvalFirewallRule(domainSettings, requestVariables, susLv)
 
 	//Check if encryption-result is already "cached" to prevent load on reverse proxy
-	firewall.Mutex.Lock()
-	encryptedIP := firewall.CacheIps[ip+fmt.Sprint(susLv)]
-	firewall.Mutex.Unlock()
+	encryptedCache, encryptedExists := firewall.CacheIps.Load(ip + fmt.Sprint(susLv))
+	encryptedIP := encryptedCache.(string)
 
-	if encryptedIP == "" {
+	if !encryptedExists {
 		hr, _, _ := time.Now().Clock()
 		switch susLv {
 		case 0:
@@ -183,9 +182,7 @@ func Middleware(writer http.ResponseWriter, request *http.Request) {
 			fmt.Fprintf(writer, "Blocked by BalooProxy.\nSuspicious request of level %d (base %d)", susLv, domainData.Stage)
 			return
 		}
-		firewall.Mutex.Lock()
-		firewall.CacheIps[ip+fmt.Sprint(susLv)] = encryptedIP
-		firewall.Mutex.Unlock()
+		firewall.CacheIps.Store(ip+fmt.Sprint(susLv), encryptedIP)
 	}
 
 	//Check if client provided correct verification result
@@ -211,11 +208,10 @@ func Middleware(writer http.ResponseWriter, request *http.Request) {
 			secretPart := encryptedIP[:6]
 			publicPart := encryptedIP[6:]
 
-			firewall.Mutex.Lock()
-			captchaData := firewall.CacheImgs[secretPart]
-			firewall.Mutex.Unlock()
+			captchaCache, captchaExists := firewall.CacheImgs.Load(secretPart)
+			captchaData := captchaCache.(string)
 
-			if captchaData == "" {
+			if !captchaExists {
 				captchaImg := image.NewRGBA(image.Rect(0, 0, 100, 37))
 				utils.AddLabel(captchaImg, rand.Intn(90), rand.Intn(30), publicPart[:6], color.RGBA{255, 0, 0, 100})
 				utils.AddLabel(captchaImg, 25, 18, secretPart, color.RGBA{61, 140, 64, 255})
@@ -238,9 +234,7 @@ func Middleware(writer http.ResponseWriter, request *http.Request) {
 
 				captchaData = base64.StdEncoding.EncodeToString(data)
 
-				firewall.Mutex.Lock()
-				firewall.CacheImgs[secretPart] = captchaData
-				firewall.Mutex.Unlock()
+				firewall.CacheImgs.Store(secretPart, captchaData)
 			}
 
 			writer.Header().Set("Content-Type", "text/html")
