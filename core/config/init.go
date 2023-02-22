@@ -114,7 +114,7 @@ func Load() {
 
 		var cert tls.Certificate = tls.Certificate{}
 		if !proxy.Cloudflare {
-			var certErr error = nil
+			var certErr error
 			cert, certErr = tls.LoadX509KeyPair(domain.Certificate, domain.Key)
 			if certErr != nil {
 				panic("[ " + utils.RedText("!") + " ] [ " + utils.RedText("Error Loading Certificates: "+certErr.Error()) + " ]")
