@@ -17,6 +17,7 @@ import (
 	"math/rand"
 	"net"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
@@ -122,6 +123,7 @@ func Middleware(writer http.ResponseWriter, request *http.Request) {
 
 	//Demonstration of how to use "susLv". Essentially allows you to challenge specific requests with a higher challenge
 
+	//SyncMap because semi-readonly
 	settingsQuery, _ := domains.DomainsMap.Load(domainName)
 	domainSettings := settingsQuery.(domains.DomainSettings)
 
@@ -157,14 +159,14 @@ func Middleware(writer http.ResponseWriter, request *http.Request) {
 		"proxy.attack":        domainData.RawAttack,
 		"proxy.bypass_attack": domainData.BypassAttack,
 		"proxy.rps":           domainData.RequestsPerSecond,
-		"proxy.rpsAllowed":    domainData.RequestsBypassedPerSecond,
+		"proxy.rps_allowed":   domainData.RequestsBypassedPerSecond,
 	}
 
 	susLv = firewall.EvalFirewallRule(domainSettings, requestVariables, susLv)
 
 	//Check if encryption-result is already "cached" to prevent load on reverse proxy
 	encryptedIP := ""
-	encryptedCache, encryptedExists := firewall.CacheIps.Load(ip + fmt.Sprint(susLv))
+	encryptedCache, encryptedExists := firewall.CacheIps.Load(ip + strconv.Itoa(susLv))
 
 	if !encryptedExists {
 		hr, _, _ := time.Now().Clock()
@@ -172,17 +174,17 @@ func Middleware(writer http.ResponseWriter, request *http.Request) {
 		case 0:
 			//whitelisted
 		case 1:
-			encryptedIP = utils.Encrypt(ip+tlsFp+fmt.Sprint(hr), proxy.CookieOTP)
+			encryptedIP = utils.Encrypt(ip+tlsFp+strconv.Itoa(hr), proxy.CookieOTP)
 		case 2:
-			encryptedIP = utils.Encrypt(ip+tlsFp+fmt.Sprint(hr), proxy.JSOTP)
+			encryptedIP = utils.Encrypt(ip+tlsFp+strconv.Itoa(hr), proxy.JSOTP)
 		case 3:
-			encryptedIP = utils.Encrypt(ip+tlsFp+fmt.Sprint(hr), proxy.CaptchaOTP)
+			encryptedIP = utils.Encrypt(ip+tlsFp+strconv.Itoa(hr), proxy.CaptchaOTP)
 		default:
 			writer.Header().Set("Content-Type", "text/plain")
 			fmt.Fprintf(writer, "Blocked by BalooProxy.\nSuspicious request of level %d (base %d)", susLv, domainData.Stage)
 			return
 		}
-		firewall.CacheIps.Store(ip+fmt.Sprint(susLv), encryptedIP)
+		firewall.CacheIps.Store(ip+strconv.Itoa(susLv), encryptedIP)
 	} else {
 		encryptedIP = encryptedCache.(string)
 	}
@@ -505,13 +507,13 @@ func Middleware(writer http.ResponseWriter, request *http.Request) {
 	switch request.URL.Path {
 	case "/_bProxy/stats":
 		writer.Header().Set("Content-Type", "text/plain")
-		fmt.Fprintf(writer, "Stage: %s\nTotal Requests: %s\nBypassed Requests: %s\nTotal R/s: %s\nBypassed R/s: %s", fmt.Sprint(domainData.Stage), fmt.Sprint(domainData.TotalRequests), fmt.Sprint(domainData.BypassedRequests), fmt.Sprint(domainData.RequestsPerSecond), fmt.Sprint(domainData.RequestsBypassedPerSecond))
+		fmt.Fprintf(writer, "Stage: %s\nTotal Requests: %s\nBypassed Requests: %s\nTotal R/s: %s\nBypassed R/s: %s", strconv.Itoa(domainData.Stage), strconv.Itoa(domainData.TotalRequests), strconv.Itoa(domainData.BypassedRequests), strconv.Itoa(domainData.RequestsPerSecond), strconv.Itoa(domainData.RequestsBypassedPerSecond))
 		return
 	case "/_bProxy/fingerprint":
 		writer.Header().Set("Content-Type", "text/plain")
 
 		firewall.Mutex.Lock()
-		fmt.Fprintf(writer, "IP: "+ip+"\nASN: "+fmt.Sprint(ipInfoASN)+"\nCountry: "+ipInfoCountry+"\nIP Requests: "+fmt.Sprint(ipCount)+"\nIP Challenge Requests: "+fmt.Sprint(firewall.AccessIpsCookie[ip])+"\nSusLV: "+fmt.Sprint(susLv)+"\nFingerprint: "+tlsFp+"\nBrowser: "+browser+botFp)
+		fmt.Fprintf(writer, "IP: "+ip+"\nASN: "+ipInfoASN+"\nCountry: "+ipInfoCountry+"\nIP Requests: "+strconv.Itoa(ipCount)+"\nIP Challenge Requests: "+strconv.Itoa(firewall.AccessIpsCookie[ip])+"\nSusLV: "+strconv.Itoa(susLv)+"\nFingerprint: "+tlsFp+"\nBrowser: "+browser+botFp)
 		firewall.Mutex.Unlock()
 		return
 	case "/_bProxy/verified":

@@ -3,7 +3,6 @@ package api
 import (
 	"fmt"
 	"goProxy/core/domains"
-	"goProxy/core/firewall"
 	"goProxy/core/proxy"
 	"goProxy/core/utils"
 	"net/http"
@@ -15,12 +14,6 @@ var ()
 func Process(writer http.ResponseWriter, request *http.Request, domainData domains.DomainData) bool {
 
 	if request.Header.Get("proxy-secret") != proxy.APISecret {
-		firewall.Mutex.Lock()
-		domainData = domains.DomainsData[request.Host]
-		domainData.TotalRequests++
-		domainData.BypassedRequests++
-		domains.DomainsData[request.Host] = domainData
-		firewall.Mutex.Unlock()
 		return false
 	}
 
