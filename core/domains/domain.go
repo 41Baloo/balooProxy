@@ -84,7 +84,6 @@ type DomainData struct {
 
 type Proxy struct {
 	Cloudflare   bool              `json:"cloudflare"`
-	MaxLogLength int               `json:"maxLogLength"`
 	AdminSecret  string            `json:"adminsecret"`
 	APISecret    string            `json:"apisecret"`
 	Secrets      map[string]string `json:"secrets"`

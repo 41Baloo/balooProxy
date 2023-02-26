@@ -81,7 +81,7 @@ func Middleware(writer http.ResponseWriter, request *http.Request) {
 	domains.DomainsData[domainName] = domainData
 	firewall.Mutex.Unlock()
 
-	writer.Header().Set("baloo-Proxy", "1.2")
+	writer.Header().Set("baloo-Proxy", "1.3")
 
 	//Start the suspicious level where the stage currently is
 	susLv := domainData.Stage
@@ -133,6 +133,8 @@ func Middleware(writer http.ResponseWriter, request *http.Request) {
 		ipInfoCountry, ipInfoASN = utils.GetIpInfo(ip)
 	}
 
+	reqUa := request.UserAgent()
+
 	requestVariables := gofilter.Message{
 		"ip.src":                net.ParseIP(ip),
 		"ip.country":            ipInfoCountry,
@@ -149,7 +151,7 @@ func Middleware(writer http.ResponseWriter, request *http.Request) {
 		"http.url":       request.RequestURI,
 		"http.query":     request.URL.RawQuery,
 		"http.path":      request.URL.Path,
-		"http.UserAgent": strings.ToLower(request.UserAgent()),
+		"http.UserAgent": strings.ToLower(reqUa),
 		"http.cookie":    request.Header.Get("Cookie"),
 		"http.headers":   fmt.Sprint(request.Header),
 
@@ -174,11 +176,11 @@ func Middleware(writer http.ResponseWriter, request *http.Request) {
 		case 0:
 			//whitelisted
 		case 1:
-			encryptedIP = utils.Encrypt(ip+tlsFp+strconv.Itoa(hr), proxy.CookieOTP)
+			encryptedIP = utils.Encrypt(ip+tlsFp+reqUa+strconv.Itoa(hr), proxy.CookieOTP)
 		case 2:
-			encryptedIP = utils.Encrypt(ip+tlsFp+strconv.Itoa(hr), proxy.JSOTP)
+			encryptedIP = utils.Encrypt(ip+tlsFp+reqUa+strconv.Itoa(hr), proxy.JSOTP)
 		case 3:
-			encryptedIP = utils.Encrypt(ip+tlsFp+strconv.Itoa(hr), proxy.CaptchaOTP)
+			encryptedIP = utils.Encrypt(ip+tlsFp+reqUa+strconv.Itoa(hr), proxy.CaptchaOTP)
 		default:
 			writer.Header().Set("Content-Type", "text/plain")
 			fmt.Fprintf(writer, "Blocked by BalooProxy.\nSuspicious request of level %d (base %d)", susLv, domainData.Stage)

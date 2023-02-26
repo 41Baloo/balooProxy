@@ -57,6 +57,14 @@ func Monitor() {
 		proxy.TWidth = tempWidth + 18
 		if tempHeight != proxy.THeight || tempWidth+18 != proxy.TWidth {
 			proxy.THeight = tempHeight
+
+			pHeight := tempHeight - 15
+			if pHeight < 0 {
+				proxy.MaxLogLength = 0
+			} else {
+				proxy.MaxLogLength = pHeight
+			}
+
 			screen.Clear()
 			screen.MoveTopLeft()
 			fmt.Println("\033[" + fmt.Sprint(12+proxy.MaxLogLength) + ";1H")
@@ -309,7 +317,6 @@ func reloadConfig() {
 	json.NewDecoder(file).Decode(&domains.Config)
 
 	proxy.Cloudflare = domains.Config.Proxy.Cloudflare
-	proxy.MaxLogLength = domains.Config.Proxy.MaxLogLength
 
 	proxy.CookieSecret = domains.Config.Proxy.Secrets["cookie"]
 	proxy.JSSecret = domains.Config.Proxy.Secrets["javascript"]

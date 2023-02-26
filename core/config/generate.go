@@ -20,7 +20,6 @@ func Generate() {
 	gConfig := domains.Configuration{
 		Proxy: domains.Proxy{
 			Cloudflare:   utils.AskBool("Use This Proxy With Cloudflare? (y/N)", false),
-			MaxLogLength: utils.AskInt("How Long Should The Access Logs Be?", 10),
 			AdminSecret:  utils.RandomString(25),
 			APISecret:    utils.RandomString(30),
 			Secrets: map[string]string{

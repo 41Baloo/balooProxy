@@ -30,7 +30,6 @@ func Load() {
 	json.NewDecoder(file).Decode(&domains.Config)
 
 	proxy.Cloudflare = domains.Config.Proxy.Cloudflare
-	proxy.MaxLogLength = domains.Config.Proxy.MaxLogLength
 
 	proxy.CookieSecret = domains.Config.Proxy.Secrets["cookie"]
 	proxy.JSSecret = domains.Config.Proxy.Secrets["javascript"]
