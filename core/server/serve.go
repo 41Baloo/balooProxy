@@ -172,7 +172,7 @@ func (rt *RoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
 		errStrs := strings.Split(err.Error(), " ")
 		errMsg := ""
 		for _, str := range errStrs {
-			if !strings.Contains(str, ".") && !strings.Contains(str, "/") {
+			if !strings.Contains(str, ".") && !strings.Contains(str, "/") && !(strings.Contains(str, "[") && strings.Contains(str, "]")) {
 				errMsg += str + " "
 			}
 		}
@@ -230,7 +230,7 @@ func (rt *RoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
 			<div class="container">
 				<div class="error-box">
 				<h1>Error: ` + errMsg + `</h1>
-				<p>Sorry, the backend returned an error. That's all we know.</p>
+				<p>Sorry, there was an error connecting to the backend. That's all we know.</p>
 				<a onclick="location.reload()">Reload page</a>
 				</div>
 			</div>
