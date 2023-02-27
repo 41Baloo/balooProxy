@@ -149,7 +149,7 @@ function checkAnswer(event) {
 	// Get the user's input
 	var input = document.getElementById('text').value;
 
-	document.cookie = '_3__bProxy_v='+input+'%s; SameSite=None; path=/; Secure';
+	document.cookie = '_3__bProxy_v='+input+'%s; SameSite=Lax; path=/; Secure';
 
 	// Check if the input is correct
 	fetch('https://' + location.hostname + '/_bProxy/verified').then(function(response) {

@@ -203,12 +203,12 @@ func Middleware(writer http.ResponseWriter, request *http.Request) {
 		case 0:
 			//This request is not to be challenged (whitelist)
 		case 1:
-			writer.Header().Set("Set-Cookie", "_1__bProxy_v="+encryptedIP+"; SameSite=None; path=/; Secure")
+			writer.Header().Set("Set-Cookie", "_1__bProxy_v="+encryptedIP+"; SameSite=Lax; path=/; Secure")
 			http.Redirect(writer, request, request.URL.RequestURI(), http.StatusTemporaryRedirect)
 			return
 		case 2:
 			writer.Header().Set("Content-Type", "text/html")
-			fmt.Fprintf(writer, `<script>document.cookie = '_2__bProxy_v=%s; SameSite=None; path=/; Secure';window.location.reload();</script>`, encryptedIP)
+			fmt.Fprintf(writer, `<script>document.cookie = '_2__bProxy_v=%s; SameSite=Lax; path=/; Secure';window.location.reload();</script>`, encryptedIP)
 			return
 		case 3:
 			secretPart := encryptedIP[:6]
@@ -406,7 +406,7 @@ func Middleware(writer http.ResponseWriter, request *http.Request) {
 						// Get the user's input
 						var input = document.getElementById('text').value;
 
-						document.cookie = '%s_3__bProxy_v='+input+'%s; SameSite=None; path=/; Secure';
+						document.cookie = '%s_3__bProxy_v='+input+'%s; SameSite=Lax; path=/; Secure';
 
 						// Check if the input is correct
 						fetch('https://' + location.hostname + '/_bProxy/verified').then(function(response) {
