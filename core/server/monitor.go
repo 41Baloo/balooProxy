@@ -294,6 +294,13 @@ func commands() {
 				clearCache()
 				fmt.Println("\033[" + fmt.Sprint(12+proxy.MaxLogLength) + ";1H")
 				fmt.Print("[ " + utils.RedText("Command") + " ]: \033[s")
+			case "reload":
+				screen.Clear()
+				screen.MoveTopLeft()
+				fmt.Println("[ " + utils.RedText("Reloading Proxy") + " ] ...")
+				reloadConfig()
+				fmt.Println("\033[" + fmt.Sprint(12+proxy.MaxLogLength) + ";1H")
+				fmt.Print("[ " + utils.RedText("Command") + " ]: \033[s")
 			default:
 				screen.Clear()
 				screen.MoveTopLeft()

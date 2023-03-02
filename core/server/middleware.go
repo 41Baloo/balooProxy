@@ -153,7 +153,6 @@ func Middleware(writer http.ResponseWriter, request *http.Request) {
 		"http.path":      request.URL.Path,
 		"http.UserAgent": strings.ToLower(reqUa),
 		"http.cookie":    request.Header.Get("Cookie"),
-		"http.headers":   fmt.Sprint(request.Header),
 
 		"proxy.stage":         domainData.Stage,
 		"proxy.cloudflare":    domains.Config.Proxy.Cloudflare,
