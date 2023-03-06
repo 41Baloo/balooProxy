@@ -507,6 +507,7 @@ func clearOutdatedCache() {
 			}
 			return true
 		})
+		reloadConfig()
 		time.Sleep(5 * time.Hour)
 	}
 }
