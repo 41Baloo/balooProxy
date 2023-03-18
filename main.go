@@ -12,6 +12,8 @@ import (
 	"time"
 )
 
+var caughtCrashes = 0
+
 func main() {
 
 	logFile, err := os.OpenFile("crash.log", os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0644)
@@ -28,8 +30,13 @@ func main() {
 
 			errMsg := fmt.Sprintf("[ "+time.Now().Format("15:05:04")+" ]: Caught Panic: %v\n\n%s\n", r, bytes.TrimRight(stackTrace, "\x00"))
 			logFile.WriteString(errMsg)
-			logFile.WriteString("[ " + time.Now().Format("15:05:04") + " ]: Attempting to recover ...\n")
-			main()
+			if caughtCrashes < 10 {
+				caughtCrashes++
+				logFile.WriteString("[ " + time.Now().Format("15:05:04") + " ]: Attempting to recover ...\n")
+				main()
+			} else {
+				panic("[ balooProxy seems to be in a bad state. Please check crash.log for more information ]")
+			}
 		}
 	}()
 
@@ -40,8 +47,6 @@ func main() {
 
 	go server.Serve()
 	go server.Monitor()
-
-	//panic("intentional crash")
 
 	//Keep server running
 	select {}
