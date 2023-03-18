@@ -27,6 +27,7 @@ func Serve() {
 			WriteTimeout:      proxy.WriteTimeoutDuration,
 			ReadHeaderTimeout: proxy.ReadHeaderTimeoutDuration,
 			Addr:              ":80",
+			MaxHeaderBytes:    1 << 20,
 		}
 
 		service.Handler = http.HandlerFunc(Middleware)
@@ -43,6 +44,7 @@ func Serve() {
 			ReadHeaderTimeout: proxy.ReadHeaderTimeoutDuration,
 			ConnState:         firewall.OnStateChange,
 			Addr:              ":80",
+			MaxHeaderBytes:    1 << 20,
 		}
 		serviceH := &http.Server{
 			IdleTimeout:       proxy.IdleTimeoutDuration,
@@ -54,7 +56,9 @@ func Serve() {
 			TLSConfig: &tls.Config{
 				GetConfigForClient: firewall.Fingerprint,
 				GetCertificate:     domains.GetCertificate,
+				Renegotiation:      tls.RenegotiateOnceAsClient,
 			},
+			MaxHeaderBytes: 1 << 20,
 		}
 
 		service.Handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -76,10 +80,10 @@ func Serve() {
 
 			http.Redirect(w, r, "https://"+r.Host+r.URL.Path+r.URL.RawQuery, http.StatusMovedPermanently)
 		})
-		service.SetKeepAlivesEnabled(false)
+		//service.SetKeepAlivesEnabled(false)
 
 		serviceH.Handler = http.HandlerFunc(Middleware)
-		serviceH.SetKeepAlivesEnabled(false)
+		//serviceH.SetKeepAlivesEnabled(false)
 
 		go func() {
 			if err := serviceH.ListenAndServeTLS("", ""); err != nil {

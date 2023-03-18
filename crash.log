@@ -1,0 +1,11 @@
+[ 07:04:41 ]: Caught Panic: intentional crash
+
+goroutine 1 [running]:
+main.main.func1()
+	/workspaces/balooProxy/main.go:27 +0x7e
+panic({0x723780, 0x823b90})
+	/usr/local/go/src/runtime/panic.go:884 +0x212
+main.main()
+	/workspaces/balooProxy/main.go:44 +0x110
+
+[ 07:04:41 ]: Attempting to recover ...
