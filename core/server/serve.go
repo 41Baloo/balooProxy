@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"goProxy/core/domains"
 	"goProxy/core/firewall"
+	"goProxy/core/pnc"
 	"goProxy/core/proxy"
 	"goProxy/core/utils"
 	"io"
@@ -19,6 +20,8 @@ import (
 )
 
 func Serve() {
+
+	defer pnc.PanicHndl()
 
 	if domains.Config.Proxy.Cloudflare {
 		service := &http.Server{
@@ -86,6 +89,7 @@ func Serve() {
 		//serviceH.SetKeepAlivesEnabled(false)
 
 		go func() {
+			defer pnc.PanicHndl()
 			if err := serviceH.ListenAndServeTLS("", ""); err != nil {
 				panic(err)
 			}

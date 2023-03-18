@@ -21,6 +21,7 @@ import (
 
 	"goProxy/core/domains"
 	"goProxy/core/firewall"
+	"goProxy/core/pnc"
 	"goProxy/core/proxy"
 	"goProxy/core/utils"
 )
@@ -30,6 +31,9 @@ var (
 )
 
 func Monitor() {
+
+	defer pnc.PanicHndl()
+
 	PrintMutex.Lock()
 	screen.Clear()
 	screen.MoveTopLeft()
@@ -209,6 +213,9 @@ func printStats() {
 }
 
 func commands() {
+
+	defer pnc.PanicHndl()
+
 	scanner := bufio.NewScanner(os.Stdin)
 	for {
 		if scanner.Scan() {
@@ -459,6 +466,9 @@ func reloadConfig() {
 }
 
 func clearProxyCache() {
+
+	defer pnc.PanicHndl()
+
 	for {
 		//Clear logs and maps every 2 minutes. (I know this is a lazy way to do it, tho for now it seems to be the most efficient and fast way to go about it)
 		firewall.Mutex.Lock()
@@ -498,6 +508,9 @@ func clearCache() {
 }
 
 func clearOutdatedCache() {
+
+	defer pnc.PanicHndl()
+
 	for {
 		currTime := int(time.Now().Unix())
 		domains.DomainsCache.Range(func(key, value any) bool {
@@ -514,11 +527,14 @@ func clearOutdatedCache() {
 
 func generateOTPSecrets() {
 
+	defer pnc.PanicHndl()
+
 	//You can change this to use hours as the hash key, to make it even more secure against offline bruteforcing, however, if you use multiple servers make sure they all start within the same timeframe, e.g.
 	//Server1 starts at 23:59:50, Server2 starts at 00:00:01. In this case the keys are mismatched and clients would have to solve challenges again whenever they access a different server than before.
 	//To avoid this and help you, this function runs every minute, reducing this offset to only 1 minute maximum of mismatch per day
 
 	for {
+
 		currTime := time.Now()
 		currDate := currTime.Format("2006-01-02")
 

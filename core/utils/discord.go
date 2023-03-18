@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"goProxy/core/domains"
+	"goProxy/core/pnc"
 	"goProxy/core/proxy"
 	"net/http"
 	"strings"
@@ -23,6 +24,8 @@ func InitPlaceholders(msg string, domainData domains.DomainData, domain string) 
 }
 
 func SendWebhook(domainData domains.DomainData, domainSettings domains.DomainSettings, notificationType int) {
+
+	defer pnc.PanicHndl()
 
 	if domainSettings.DomainWebhooks.URL == "" {
 		return

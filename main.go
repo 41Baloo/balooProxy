@@ -1,15 +1,12 @@
 package main
 
 import (
-	"bytes"
-	"fmt"
 	"goProxy/core/config"
+	"goProxy/core/pnc"
 	"goProxy/core/server"
 	"io"
 	"log"
 	"os"
-	"runtime"
-	"time"
 )
 
 var caughtCrashes = 0
@@ -22,23 +19,9 @@ func main() {
 	}
 	defer logFile.Close()
 
-	defer func() {
-		if r := recover(); r != nil {
-			// Get the stack trace for the panic
-			stackTrace := make([]byte, 4096)
-			runtime.Stack(stackTrace, false)
+	pnc.InitHndl()
 
-			errMsg := fmt.Sprintf("[ "+time.Now().Format("15:05:04")+" ]: Caught Panic: %v\n\n%s\n", r, bytes.TrimRight(stackTrace, "\x00"))
-			logFile.WriteString(errMsg)
-			if caughtCrashes < 10 {
-				caughtCrashes++
-				logFile.WriteString("[ " + time.Now().Format("15:05:04") + " ]: Attempting to recover ...\n")
-				main()
-			} else {
-				panic("[ balooProxy seems to be in a bad state. Please check crash.log for more information ]")
-			}
-		}
-	}()
+	defer pnc.PanicHndl()
 
 	//Disable Error Logging
 	log.SetOutput(io.Discard)
