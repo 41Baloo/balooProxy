@@ -55,4 +55,6 @@ var (
 	CACHE_QUERY = 6
 	//IP
 	CACHE_CLIENTIP = 7
+
+	CurrHour int
 )

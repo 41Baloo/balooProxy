@@ -34,7 +34,7 @@ func Serve() {
 		}
 
 		service.Handler = http.HandlerFunc(Middleware)
-		service.SetKeepAlivesEnabled(false)
+		//service.SetKeepAlivesEnabled(false)
 
 		if err := service.ListenAndServe(); err != nil {
 			panic(err)

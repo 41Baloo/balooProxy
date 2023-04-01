@@ -170,16 +170,15 @@ func Middleware(writer http.ResponseWriter, request *http.Request) {
 	encryptedCache, encryptedExists := firewall.CacheIps.Load(ip + strconv.Itoa(susLv))
 
 	if !encryptedExists {
-		hr, _, _ := time.Now().Clock()
 		switch susLv {
 		case 0:
 			//whitelisted
 		case 1:
-			encryptedIP = utils.Encrypt(ip+tlsFp+reqUa+strconv.Itoa(hr), proxy.CookieOTP)
+			encryptedIP = utils.Encrypt(ip+tlsFp+reqUa+strconv.Itoa(proxy.CurrHour), proxy.CookieOTP)
 		case 2:
-			encryptedIP = utils.Encrypt(ip+tlsFp+reqUa+strconv.Itoa(hr), proxy.JSOTP)
+			encryptedIP = utils.Encrypt(ip+tlsFp+reqUa+strconv.Itoa(proxy.CurrHour), proxy.JSOTP)
 		case 3:
-			encryptedIP = utils.Encrypt(ip+tlsFp+reqUa+strconv.Itoa(hr), proxy.CaptchaOTP)
+			encryptedIP = utils.Encrypt(ip+tlsFp+reqUa+strconv.Itoa(proxy.CurrHour), proxy.CaptchaOTP)
 		default:
 			writer.Header().Set("Content-Type", "text/plain")
 			fmt.Fprintf(writer, "Blocked by BalooProxy.\nSuspicious request of level %d (base %d)", susLv, domainData.Stage)
@@ -191,7 +190,7 @@ func Middleware(writer http.ResponseWriter, request *http.Request) {
 	}
 
 	//Check if client provided correct verification result
-	if !strings.Contains(request.Header.Get("Cookie"), fmt.Sprintf("__bProxy_v=%s", encryptedIP)) {
+	if !strings.Contains(request.Header.Get("Cookie"), "__bProxy_v="+encryptedIP) {
 
 		firewall.Mutex.Lock()
 		firewall.AccessIpsCookie[ip] = firewall.AccessIpsCookie[ip] + 1

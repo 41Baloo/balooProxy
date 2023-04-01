@@ -149,6 +149,9 @@ func checkAttack(domainName string, domainData domains.DomainData) {
 }
 
 func printStats() {
+
+	proxy.CurrHour, _, _ = time.Now().Clock()
+
 	result, err := cpu.Percent(0, false)
 	if err != nil {
 		proxy.CpuUsage = "ERR"
