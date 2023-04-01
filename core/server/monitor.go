@@ -524,9 +524,7 @@ func clearOutdatedCache() {
 			}
 			return true
 		})
-		firewall.Mutex.Lock()
 		reloadConfig()
-		firewall.Mutex.Unlock()
 		time.Sleep(5 * time.Hour)
 	}
 }

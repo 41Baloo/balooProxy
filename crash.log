@@ -1,0 +1,36 @@
+[ 16:49:01 ]: Caught Panic: listen tcp :80: bind: permission denied
+
+goroutine 24 [running]:
+goProxy/core/pnc.PanicHndl()
+	/workspaces/balooProxy/core/pnc/panicHandler.go:25 +0x7a
+panic({0x746e40, 0xc000190780})
+	/usr/local/go/src/runtime/panic.go:884 +0x212
+goProxy/core/server.Serve()
+	/workspaces/balooProxy/core/server/serve.go:40 +0x2de
+created by main.main
+	/workspaces/balooProxy/main.go:31 +0xe5
+
+[ 16:43:07 ]: Caught Panic: listen tcp :80: bind: permission denied
+
+goroutine 10 [running]:
+goProxy/core/pnc.PanicHndl()
+	/workspaces/balooProxy/core/pnc/panicHandler.go:25 +0x7a
+panic({0x746e40, 0xc000190640})
+	/usr/local/go/src/runtime/panic.go:884 +0x212
+goProxy/core/server.Serve()
+	/workspaces/balooProxy/core/server/serve.go:40 +0x2de
+created by main.main
+	/workspaces/balooProxy/main.go:31 +0xe5
+
+[ 19:17:22 ]: Caught Panic: listen tcp :80: bind: permission denied
+
+goroutine 21 [running]:
+goProxy/core/pnc.PanicHndl()
+	/workspaces/balooProxy/core/pnc/panicHandler.go:25 +0x7a
+panic({0x746e40, 0xc000078190})
+	/usr/local/go/src/runtime/panic.go:884 +0x212
+goProxy/core/server.Serve()
+	/workspaces/balooProxy/core/server/serve.go:40 +0x2de
+created by main.main
+	/workspaces/balooProxy/main.go:31 +0xe5
+
