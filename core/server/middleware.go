@@ -167,7 +167,8 @@ func Middleware(writer http.ResponseWriter, request *http.Request) {
 
 	//Check if encryption-result is already "cached" to prevent load on reverse proxy
 	encryptedIP := ""
-	encryptedCache, encryptedExists := firewall.CacheIps.Load(ip + strconv.Itoa(susLv))
+	susLvStr := strconv.Itoa(susLv)
+	encryptedCache, encryptedExists := firewall.CacheIps.Load(ip + susLvStr)
 
 	if !encryptedExists {
 		switch susLv {
@@ -181,10 +182,10 @@ func Middleware(writer http.ResponseWriter, request *http.Request) {
 			encryptedIP = utils.Encrypt(ip+tlsFp+reqUa+strconv.Itoa(proxy.CurrHour), proxy.CaptchaOTP)
 		default:
 			writer.Header().Set("Content-Type", "text/plain")
-			fmt.Fprintf(writer, "Blocked by BalooProxy.\nSuspicious request of level %d (base %d)", susLv, domainData.Stage)
+			fmt.Fprintf(writer, "Blocked by BalooProxy.\nSuspicious request of level %s (base %d)", susLvStr, domainData.Stage)
 			return
 		}
-		firewall.CacheIps.Store(ip+strconv.Itoa(susLv), encryptedIP)
+		firewall.CacheIps.Store(ip+susLvStr, encryptedIP)
 	} else {
 		encryptedIP = encryptedCache.(string)
 	}
