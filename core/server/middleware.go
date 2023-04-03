@@ -203,7 +203,7 @@ func Middleware(writer http.ResponseWriter, request *http.Request) {
 			//This request is not to be challenged (whitelist)
 		case 1:
 			writer.Header().Set("Set-Cookie", "_1__bProxy_v="+encryptedIP+"; SameSite=Lax; path=/; Secure")
-			http.Redirect(writer, request, request.URL.RequestURI(), http.StatusTemporaryRedirect)
+			http.Redirect(writer, request, request.URL.RequestURI(), http.StatusFound)
 			return
 		case 2:
 			writer.Header().Set("Content-Type", "text/html")
