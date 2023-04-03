@@ -494,23 +494,35 @@ Shows information about the last requests that passed balooProxy (The amount can
 
 The terminal allows you to input commands which change the behaviour of balooProxy
 
-### `rtlogs`
+### `help`
 
-The command `rtlogs` enables "real time logs", meaning the terminal log will not, like usually, update every second with the latest logs but will instead instantly update, as soon as there is another request to log. Notice, this might require a lot of cpu when your proxy is getting attacked
-
-### `add`
-
-The command `add` prompts you with questions to add another domain to your proxy (**Note**: This can be done in the config.json aswell, however that currently requires your proxy to restart to apply the changes)
-
-### `domain`
-
-The command `domain` followed by the name of a domain allows you to switch between your domains
+The command `help` shows you a quick summary of all available commands. Type anything or press enter to exit it
 
 ### `stage`
 
 The command `stage` followed by a number will set the proxies stage to said number
 (**Note**: Setting the `stage` manually means the proxy will remain in that `stage` no matter what. Even if an attack is ongoing that bypasses this `stage`. Setting your `stage` to `0` will set the `stage` to 1 and enable automatic stage-switching again. Setting the `stage` to a number higher than `3` will result in all requests getting blocked)
 
+### `domain`
+
+The command `domain` followed by the name of a domain allows you to switch between your domains
+
+### `add`
+
+The command `add` prompts you with questions to add another domain to your proxy (**Note**: This can be done in the config.json aswell, however that currently requires your proxy to restart to apply the changes)
+
+### `rtlogs`
+
+The command `rtlogs` enables "real time logs", meaning the terminal log will not, like usually, update every second with the latest logs but will instead instantly update, as soon as there is another request to log. Notice, this might require a lot of cpu when your proxy is getting attacked
+
+### `cachemode`
+
+The command `cachemode` toggles whether or not the proxy tries to cache content on and off. If you don't have any custom cache rules, this is disabled by default. It is suggested not to turn on if you don't have any custom cache rules, as it might lead to increased cpu usage
+
 ### `delcache`
 
 The command `delcache` allows you to instantly clear the cache of the domain you are currently watching
+
+### `reload`
+
+The command `reload` will cause the proxy to read the config.json again, aswell as reset some other generic settings, in order to apply changes from your config.json (**NOTE**: This is automatically executed every 5 hours)

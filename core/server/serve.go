@@ -106,7 +106,7 @@ func (rt *RoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
 	cacheRes := 0
 	reqIP := ""
 
-	if req.Method != "POST" {
+	if req.Method != "POST" && proxy.CacheEnabled {
 
 		domainSettings := req.Context().Value("domain").(domains.DomainSettings)
 		messages := req.Context().Value("filter").(gofilter.Message)
@@ -396,7 +396,7 @@ func (rt *RoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
 
 	resp.Header.Set("proxy-cache", "MISS")
 
-	if cacheRes != 0 && req.Method != "POST" {
+	if cacheRes != 0 && req.Method != "POST" && proxy.CacheEnabled {
 		if resp.StatusCode < 300 || (resp.StatusCode < 500 && resp.StatusCode >= 400) {
 			bodyBytes, bodyErr := io.ReadAll(resp.Body)
 

@@ -58,7 +58,7 @@
             "cacheRules": [
                 {
                     "expression": "(http.path contains \".js\" or http.path contains \".ico\" or http.path contains \".css\")",
-                    "action": "CACHE_DEFAULT"
+                    "action": "DEFAULT"
                 },
                 {
                     "expression": "(http.path eq \"/my-ip\")",

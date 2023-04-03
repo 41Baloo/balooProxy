@@ -94,6 +94,8 @@ func Load() {
 		rawCacheRules := domains.Config.Domains[i].CacheRules
 		for _, caRule := range domains.Config.Domains[i].CacheRules {
 
+			proxy.CacheEnabled = true
+
 			rule, err := gofilter.NewFilter(caRule.Expression)
 			if err != nil {
 				panic("[ " + utils.RedText("!") + " ] [ Error Loading Custom Cache Rules: " + utils.RedText(err.Error()) + " ]")

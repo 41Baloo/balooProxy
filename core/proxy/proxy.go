@@ -57,4 +57,6 @@ var (
 	CACHE_CLIENTIP = 7
 
 	CurrHour int
+
+	CacheEnabled = false
 )

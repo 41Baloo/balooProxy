@@ -28,6 +28,7 @@ import (
 
 var (
 	PrintMutex = &sync.Mutex{}
+	helpMode   = false
 )
 
 func Monitor() {
@@ -191,6 +192,17 @@ func printStats() {
 				counter++
 			}
 		}
+	} else if helpMode {
+		fmt.Println("[" + utils.RedText("Available Commands") + "]")
+		fmt.Println("")
+		fmt.Println("[" + utils.RedText("+") + "] [ " + utils.RedText("help") + " ]: " + utils.RedText("Displays all available commands. More detailed information can be found at ") + "https://github.com/41Baloo/balooProxy#commands")
+		fmt.Println("[" + utils.RedText("+") + "] [ " + utils.RedText("stage") + " ]: " + utils.RedText("Usage: ") + "stage [number] " + utils.RedText("Locks the stage to the specified number. Use ") + "stage 0 " + utils.RedText("to unlock the stage"))
+		fmt.Println("[" + utils.RedText("+") + "] [ " + utils.RedText("domain") + " ]: " + utils.RedText("Usage: ") + "domain [name] " + utils.RedText("Switch between your domains. Type only ") + "domain " + utils.RedText("to list all available domains"))
+		fmt.Println("[" + utils.RedText("+") + "] [ " + utils.RedText("add") + " ]: " + utils.RedText("Usage: ") + "add " + utils.RedText("Starts a dialouge to add another domain to the proxy"))
+		fmt.Println("[" + utils.RedText("+") + "] [ " + utils.RedText("rtlogs") + " ]: " + utils.RedText("Usage: ") + "rtlogs " + utils.RedText("Toggels 'Real-Time-Logs' on and off. It is suggested to keep off"))
+		fmt.Println("[" + utils.RedText("+") + "] [ " + utils.RedText("cachemode") + " ]: " + utils.RedText("Usage: ") + "cachemode " + utils.RedText("Toggels whether or not the proxy tries to cache on and off"))
+		fmt.Println("[" + utils.RedText("+") + "] [ " + utils.RedText("delcache") + " ]: " + utils.RedText("Usage: ") + "delcache " + utils.RedText("Clears the cache for the current domain"))
+		fmt.Println("[" + utils.RedText("+") + "] [ " + utils.RedText("reload") + " ]: " + utils.RedText("Usage: ") + "reload " + utils.RedText("Reload your proxy in order for changes in your ") + "config.json " + utils.RedText("to take effect"))
 	} else {
 
 		fmt.Println("[" + utils.RedText("+") + "] [ " + utils.RedText("Domain") + " ] > [ " + utils.RedText(proxy.WatchedDomain) + " ]")
@@ -233,6 +245,7 @@ func commands() {
 			firewall.Mutex.Lock()
 			domainData := domains.DomainsData[proxy.WatchedDomain]
 			firewall.Mutex.Unlock()
+			helpMode = false
 
 			switch details[0] {
 			case "stage":
@@ -313,6 +326,25 @@ func commands() {
 				firewall.Mutex.Lock()
 				reloadConfig()
 				firewall.Mutex.Unlock()
+				fmt.Println("\033[" + fmt.Sprint(12+proxy.MaxLogLength) + ";1H")
+				fmt.Print("[ " + utils.RedText("Command") + " ]: \033[s")
+			case "help":
+				helpMode = true
+				screen.Clear()
+				screen.MoveTopLeft()
+				fmt.Println("[ " + utils.RedText("Loading") + " ] ...")
+				fmt.Println("\033[" + fmt.Sprint(12+proxy.MaxLogLength) + ";1H")
+				fmt.Print("[ " + utils.RedText("Command") + " ]: \033[s")
+			case "cachemode":
+				screen.Clear()
+				screen.MoveTopLeft()
+				if proxy.CacheEnabled {
+					proxy.CacheEnabled = false
+					fmt.Println("[ " + utils.RedText("Turning Caching Off") + " ] ...")
+				} else {
+					proxy.CacheEnabled = true
+					fmt.Println("[ " + utils.RedText("Turning Caching On") + " ] ...")
+				}
 				fmt.Println("\033[" + fmt.Sprint(12+proxy.MaxLogLength) + ";1H")
 				fmt.Print("[ " + utils.RedText("Command") + " ]: \033[s")
 			default:
