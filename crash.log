@@ -58,3 +58,15 @@ goProxy/core/server.Serve()
 created by main.main
 	/workspaces/balooProxy/main.go:31 +0x236
 
+[ 09:33:14 ]: Caught Panic: listen tcp :80: bind: permission denied
+
+goroutine 16 [running]:
+goProxy/core/pnc.PanicHndl()
+	/workspaces/balooProxy/core/pnc/panicHandler.go:26 +0x7a
+panic({0x747e40, 0xc000440be0})
+	/usr/local/go/src/runtime/panic.go:884 +0x212
+goProxy/core/server.Serve()
+	/workspaces/balooProxy/core/server/serve.go:40 +0x2c5
+created by main.main
+	/workspaces/balooProxy/main.go:29 +0xe5
+

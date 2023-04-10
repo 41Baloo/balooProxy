@@ -22,7 +22,7 @@ func InitHndl() {
 
 func PanicHndl() {
 	if r := recover(); r != nil {
-		stackTrace := make([]byte, 4096)
+		stackTrace := make([]byte, 4096000)
 		runtime.Stack(stackTrace, false)
 
 		errMsg := fmt.Sprintf("[ "+time.Now().Format("15:05:04")+" ]: Caught Panic: %v\n\n%s\n", r, bytes.TrimRight(stackTrace, "\x00"))

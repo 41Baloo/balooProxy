@@ -9,8 +9,6 @@ import (
 	"os"
 )
 
-var caughtCrashes = 0
-
 func main() {
 
 	logFile, err := os.OpenFile("crash.log", os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0644)

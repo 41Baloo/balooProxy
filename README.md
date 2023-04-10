@@ -42,7 +42,21 @@ Not everyone can afford expensive servers, aswell as a global cdn and this is fi
 
 # **Installation**
 
-In order to install balooProxy simply download the [latest version of balooProxy](https://github.com/41Baloo/balooProxy/releases). You can either use a pre-configured `config.json` or configure your proxy when running it for the first time without a `config.json`.
+## **Server Setup**
+
+To start, download the [latest version of balooProxy](https://github.com/41Baloo/balooProxy/releases) balooProxy or compile it from source.
+
+If you already have a `config.json` drag it in the same folder in your server as the `main` you downloaded/compiled. If you do not, simply start balooProxy by running `./main` and answer the questions the proxy asks you. After you answered those questions stop the proxy with `ctrl + c`.
+
+You can run the proxy as a [service](https://abhinand05.medium.com/run-any-executable-as-systemd-service-in-linux-21298674f66f) or inside of a screen. To run the proxy inside a screen on ubuntu/debian first run `apt update`. After that is done install screen by running `apt install screen` and follow its installation process. To start running the proxy inside of a screen run `screen -S balooProxy`. This will put you inside a screen, making sure the proxy keeps running even when you log out of ssh. Now just start the proxy inside the screen by running `./main` (make sure the proxy isnt running anywhere else already) and quit the screen by pressing `ctrl + a + d`. You can always reopen the screen by running `screen -d -r`
+
+## **DNS Setup**
+
+The proxy is now successfully running, however you still need to point your dns records to the proxy. To do so get the servers ip the proxy is currently running on. Go to your dns management and point the domain you want to proxy to the proxy ip via an `A` record, if the ip is an ipv4 or an `AAAA` record, if the ip is an ipv6. If you chose to use the proxy with Cloudflare, make sure the option "`Proxy status`" is set to "`Proxied`". If you chose not to use Cloudflare but are managing the dns via Cloudflare, make sure "`Proxy status`" is set to "`DNS only`". Also make sure no other records are pointing to your actual backend, since the proxy can otherwise be bypassed by attacking the backend directly, without first going through the proxy. After you did all of that wait ~10 minutes for the dns entry to register. You can check if your domain is successfully proxied by opening a new tab in the browser of your choice, opening dev tools, navigating to the network tab, opening your website, and searching for a "`baloo-proxy`" header in "Response Headers" of your request. If that exist, you successfully setup balooProxy
+
+![DNS Example](https://cdn.discordapp.com/attachments/1007957829795201116/1094910870372483072/image.png)
+![Network Tab](https://cdn.discordapp.com/attachments/1007957829795201116/1094912722174492672/image.png)
+
 
 ## **Configuration**
 ---
@@ -127,6 +141,79 @@ Refer to [Custom Firewall Rules](#Custom-Firewall-Rules)
 ---
 
 Refer to [Custom Cache Rules](#Custom-cache-rules)
+
+# **Terminal**
+
+## **Main Hud**
+---
+
+The main hud shows you different information about your proxy
+
+### `cpu`
+
+Shows you the current cpu usage of the server balooProxy is running on in percent
+
+### `stage`
+
+Shows you the stage balooProxy is currently in
+
+### `stage locked`
+
+Shows `true` if the stage was manually set and locked by using the `stage` command in the terminal
+
+### `total`
+
+Shows the number of all incoming requests per second to balooProxy
+
+### `bypassed`
+
+Shows the number of requests per second that passed balooProxy and have been forwarded to the backend
+
+### `connections`
+
+Shows the current amount of open L4 connections to balooProxy
+
+### `latest logs`
+
+Shows information about the last requests that passed balooProxy (The amount can be specified in `config.json`)
+
+## **Commands**
+---
+
+The terminal allows you to input commands which change the behaviour of balooProxy
+
+### `help`
+
+The command `help` shows you a quick summary of all available commands. Type anything or press enter to exit it
+
+### `stage`
+
+The command `stage` followed by a number will set the proxies stage to said number
+(**Note**: Setting the `stage` manually means the proxy will remain in that `stage` no matter what. Even if an attack is ongoing that bypasses this `stage`. Setting your `stage` to `0` will set the `stage` to 1 and enable automatic stage-switching again. Setting the `stage` to a number higher than `3` will result in all requests getting blocked)
+
+### `domain`
+
+The command `domain` followed by the name of a domain allows you to switch between your domains
+
+### `add`
+
+The command `add` prompts you with questions to add another domain to your proxy (**Note**: This can be done in the config.json aswell, however that currently requires your proxy to restart to apply the changes)
+
+### `rtlogs`
+
+The command `rtlogs` enables "real time logs", meaning the terminal log will not, like usually, update every second with the latest logs but will instead instantly update, as soon as there is another request to log. Notice, this might require a lot of cpu when your proxy is getting attacked
+
+### `cachemode`
+
+The command `cachemode` toggles whether or not the proxy tries to cache content on and off. If you don't have any custom cache rules, this is disabled by default. It is suggested not to turn on if you don't have any custom cache rules, as it might lead to increased cpu usage
+
+### `delcache`
+
+The command `delcache` allows you to instantly clear the cache of the domain you are currently watching
+
+### `reload`
+
+The command `reload` will cause the proxy to read the config.json again, aswell as reset some other generic settings, in order to apply changes from your config.json (**NOTE**: This is automatically executed every 5 hours)
 
 # **Custom Firewall Rules**
 
@@ -452,77 +539,3 @@ Use `Query` as cache-key. The same `Query` for different `Paths`/`Methods` will 
 ### `CLIENTIP`
 
 Use `IP` as cache-key. The same `IP` will always get the same result
-
-
-# **Terminal**
-
-## **Main Hud**
----
-
-The main hud shows you different information about your proxy
-
-### `cpu`
-
-Shows you the current cpu usage of the server balooProxy is running on in percent
-
-### `stage`
-
-Shows you the stage balooProxy is currently in
-
-### `stage locked`
-
-Shows `true` if the stage was manually set and locked by using the `stage` command in the terminal
-
-### `total`
-
-Shows the number of all incoming requests per second to balooProxy
-
-### `bypassed`
-
-Shows the number of requests per second that passed balooProxy and have been forwarded to the backend
-
-### `connections`
-
-Shows the current amount of open L4 connections to balooProxy
-
-### `latest logs`
-
-Shows information about the last requests that passed balooProxy (The amount can be specified in `config.json`)
-
-## **Commands**
----
-
-The terminal allows you to input commands which change the behaviour of balooProxy
-
-### `help`
-
-The command `help` shows you a quick summary of all available commands. Type anything or press enter to exit it
-
-### `stage`
-
-The command `stage` followed by a number will set the proxies stage to said number
-(**Note**: Setting the `stage` manually means the proxy will remain in that `stage` no matter what. Even if an attack is ongoing that bypasses this `stage`. Setting your `stage` to `0` will set the `stage` to 1 and enable automatic stage-switching again. Setting the `stage` to a number higher than `3` will result in all requests getting blocked)
-
-### `domain`
-
-The command `domain` followed by the name of a domain allows you to switch between your domains
-
-### `add`
-
-The command `add` prompts you with questions to add another domain to your proxy (**Note**: This can be done in the config.json aswell, however that currently requires your proxy to restart to apply the changes)
-
-### `rtlogs`
-
-The command `rtlogs` enables "real time logs", meaning the terminal log will not, like usually, update every second with the latest logs but will instead instantly update, as soon as there is another request to log. Notice, this might require a lot of cpu when your proxy is getting attacked
-
-### `cachemode`
-
-The command `cachemode` toggles whether or not the proxy tries to cache content on and off. If you don't have any custom cache rules, this is disabled by default. It is suggested not to turn on if you don't have any custom cache rules, as it might lead to increased cpu usage
-
-### `delcache`
-
-The command `delcache` allows you to instantly clear the cache of the domain you are currently watching
-
-### `reload`
-
-The command `reload` will cause the proxy to read the config.json again, aswell as reset some other generic settings, in order to apply changes from your config.json (**NOTE**: This is automatically executed every 5 hours)
