@@ -30,3 +30,8 @@ func PanicHndl() {
 		panic(r)
 	}
 }
+
+func LogError(msg string) {
+	errMsg := fmt.Sprintf("[ "+time.Now().Format("15:05:04")+" ]: Error: %s\n", msg)
+	logFile.WriteString(errMsg)
+}

@@ -27,6 +27,7 @@ func Load() {
 			panic(err)
 		}
 	}
+	defer file.Close()
 	json.NewDecoder(file).Decode(&domains.Config)
 
 	proxy.Cloudflare = domains.Config.Proxy.Cloudflare
