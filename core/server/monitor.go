@@ -78,11 +78,11 @@ func Monitor() {
 		utils.ClearScreen(proxy.MaxLogLength)
 		fmt.Print("\033[1;1H")
 
+		firewall.Mutex.Lock()
 		for name, data := range domains.DomainsData {
-			firewall.Mutex.Lock()
 			checkAttack(name, data)
-			firewall.Mutex.Unlock()
 		}
+		firewall.Mutex.Unlock()
 
 		printStats()
 
