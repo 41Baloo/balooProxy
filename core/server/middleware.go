@@ -8,6 +8,7 @@ import (
 	"goProxy/core/api"
 	"goProxy/core/domains"
 	"goProxy/core/firewall"
+	"goProxy/core/pnc"
 	"goProxy/core/proxy"
 	"goProxy/core/utils"
 	"image"
@@ -25,6 +26,9 @@ import (
 )
 
 func Middleware(writer http.ResponseWriter, request *http.Request) {
+
+	defer pnc.PanicHndl()
+
 	domainName := request.Host
 
 	firewall.Mutex.Lock()
