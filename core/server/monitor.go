@@ -297,9 +297,7 @@ func commands() {
 				fmt.Println("[ " + utils.RedText("Loading") + " ] ...")
 				fmt.Println("\033[" + fmt.Sprint(12+proxy.MaxLogLength) + ";1H")
 				fmt.Print("[ " + utils.RedText("Command") + " ]: \033[s")
-				firewall.Mutex.Lock()
 				reloadConfig()
-				firewall.Mutex.Unlock()
 			case "rtlogs":
 				screen.Clear()
 				screen.MoveTopLeft()
@@ -323,9 +321,7 @@ func commands() {
 				screen.Clear()
 				screen.MoveTopLeft()
 				fmt.Println("[ " + utils.RedText("Reloading Proxy") + " ] ...")
-				firewall.Mutex.Lock()
 				reloadConfig()
-				firewall.Mutex.Unlock()
 				fmt.Println("\033[" + fmt.Sprint(12+proxy.MaxLogLength) + ";1H")
 				fmt.Print("[ " + utils.RedText("Command") + " ]: \033[s")
 			case "help":
@@ -367,6 +363,7 @@ func reloadConfig() {
 	if err != nil {
 		panic(err)
 	}
+	defer file.Close()
 	json.NewDecoder(file).Decode(&domains.Config)
 
 	proxy.Cloudflare = domains.Config.Proxy.Cloudflare
