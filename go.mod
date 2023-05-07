@@ -8,7 +8,11 @@ require (
 	golang.org/x/image v0.5.0
 )
 
-require github.com/stretchr/testify v1.8.1 // indirect
+require (
+	github.com/klauspost/cpuid/v2 v2.0.12 // indirect
+	github.com/stretchr/testify v1.8.1 // indirect
+	github.com/zeebo/blake3 v0.2.3 // indirect
+)
 
 require (
 	github.com/go-ole/go-ole v1.2.6 // indirect

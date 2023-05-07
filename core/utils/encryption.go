@@ -1,17 +1,25 @@
 package utils
 
 import (
-	"crypto/md5"
 	"crypto/sha256"
 	"encoding/hex"
 	"math/rand"
 	"time"
+
+	"github.com/zeebo/blake3"
 )
 
+/*
 func Encrypt(input string, key string) string {
 	hasher := md5.New()
 	hasher.Write([]byte(input + key))
 	return hex.EncodeToString(hasher.Sum(nil))
+}
+*/
+
+func Encrypt(input string, key string) string {
+	hash := blake3.Sum256([]byte(input + key))
+	return hex.EncodeToString(hash[:])
 }
 
 func EncryptSha(input string, key string) string {
