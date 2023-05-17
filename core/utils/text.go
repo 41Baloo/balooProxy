@@ -56,6 +56,14 @@ func AddLogs(entry string, domainName string) domains.DomainData {
 	return domainData
 }
 
+// Only run in locked thread
+func ClearLogs(domainName string) domains.DomainData {
+	domainData := domains.DomainsData[domainName]
+	domainData.LastLogs = nil
+	domains.DomainsData[domainName] = domainData
+	return domainData
+}
+
 func MoveInputLine() {
 	fmt.Println("\033[" + fmt.Sprint(12+proxy.MaxLogLength) + ";1H")
 	fmt.Print("[ " + RedText("Command") + " ]: \033[u\033[s")

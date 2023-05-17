@@ -200,6 +200,7 @@ func printStats() {
 		fmt.Println("[" + utils.RedText("+") + "] [ " + utils.RedText("domain") + " ]: " + utils.RedText("Usage: ") + "domain [name] " + utils.RedText("Switch between your domains. Type only ") + "domain " + utils.RedText("to list all available domains"))
 		fmt.Println("[" + utils.RedText("+") + "] [ " + utils.RedText("add") + " ]: " + utils.RedText("Usage: ") + "add " + utils.RedText("Starts a dialouge to add another domain to the proxy"))
 		fmt.Println("[" + utils.RedText("+") + "] [ " + utils.RedText("rtlogs") + " ]: " + utils.RedText("Usage: ") + "rtlogs " + utils.RedText("Toggels 'Real-Time-Logs' on and off. It is suggested to keep off"))
+		fmt.Println("[" + utils.RedText("+") + "] [ " + utils.RedText("rtlogs") + " ]: " + utils.RedText("Usage: ") + "clrlogs " + utils.RedText("Clears all logs for the current domain"))
 		fmt.Println("[" + utils.RedText("+") + "] [ " + utils.RedText("cachemode") + " ]: " + utils.RedText("Usage: ") + "cachemode " + utils.RedText("Toggels whether or not the proxy tries to cache on and off"))
 		fmt.Println("[" + utils.RedText("+") + "] [ " + utils.RedText("delcache") + " ]: " + utils.RedText("Usage: ") + "delcache " + utils.RedText("Clears the cache for the current domain"))
 		fmt.Println("[" + utils.RedText("+") + "] [ " + utils.RedText("reload") + " ]: " + utils.RedText("Usage: ") + "reload " + utils.RedText("Reload your proxy in order for changes in your ") + "config.json " + utils.RedText("to take effect"))
@@ -307,6 +308,24 @@ func commands() {
 				} else {
 					proxy.RealTimeLogs = true
 					fmt.Println("[ " + utils.RedText("Turning Real Time Logs On") + " ] ...")
+				}
+				fmt.Println("\033[" + fmt.Sprint(12+proxy.MaxLogLength) + ";1H")
+				fmt.Print("[ " + utils.RedText("Command") + " ]: \033[s")
+			case "clrlogs":
+				screen.Clear()
+				screen.MoveTopLeft()
+				if proxy.WatchedDomain == "" {
+					for _, domain := range domains.Domains {
+						firewall.Mutex.Lock()
+						utils.ClearLogs(domain)
+						firewall.Mutex.Unlock()
+					}
+					fmt.Println("[ " + utils.RedText("Clearing Logs All Domains ") + " ] ...")
+				} else {
+					firewall.Mutex.Lock()
+					utils.ClearLogs(proxy.WatchedDomain)
+					firewall.Mutex.Unlock()
+					fmt.Println("[ " + utils.RedText("Clearing Logs For "+proxy.WatchedDomain) + " ] ...")
 				}
 				fmt.Println("\033[" + fmt.Sprint(12+proxy.MaxLogLength) + ";1H")
 				fmt.Print("[ " + utils.RedText("Command") + " ]: \033[s")
