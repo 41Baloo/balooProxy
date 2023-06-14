@@ -423,6 +423,7 @@ func reloadConfig() {
 
 		ipInfo := false
 		firewallRules := []domains.Rule{}
+		rawFirewallRules := domains.Config.Domains[i].FirewallRules
 		for _, fwRule := range domains.Config.Domains[i].FirewallRules {
 
 			if strings.Contains(fwRule.Expression, "ip.country") || strings.Contains(fwRule.Expression, "ip.asn") {
@@ -440,6 +441,7 @@ func reloadConfig() {
 		}
 
 		cacheRules := []domains.Rule{}
+		rawCacheRules := domains.Config.Domains[i].CacheRules
 		for _, caRule := range domains.Config.Domains[i].CacheRules {
 
 			rule, err := gofilter.NewFilter(caRule.Expression)
@@ -471,10 +473,12 @@ func reloadConfig() {
 		domains.DomainsMap.Store(domain.Name, domains.DomainSettings{
 			Name: domain.Name,
 
-			CustomRules: firewallRules,
-			IPInfo:      ipInfo,
+			CustomRules:    firewallRules,
+			IPInfo:         ipInfo,
+			RawCustomRules: rawFirewallRules,
 
-			CacheRules: cacheRules,
+			CacheRules:    cacheRules,
+			RawCacheRules: rawCacheRules,
 
 			DomainProxy:        dProxy,
 			DomainCertificates: cert,

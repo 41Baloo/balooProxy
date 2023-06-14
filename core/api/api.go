@@ -1,12 +1,13 @@
 package api
 
 import (
+	"encoding/json"
 	"fmt"
 	"goProxy/core/domains"
+	"goProxy/core/firewall"
 	"goProxy/core/proxy"
-	"goProxy/core/utils"
+	"io"
 	"net/http"
-	"strings"
 )
 
 var ()
@@ -17,58 +18,123 @@ func Process(writer http.ResponseWriter, request *http.Request, domainData domai
 		return false
 	}
 
-	apiQuery := request.URL.Query()
-	apiQueryDomain := apiQuery.Get("domain")
+	reqBody, err := io.ReadAll(request.Body)
+	if err != nil {
+		APIResponse(writer, false, map[string]interface{}{
+			"ERROR": ERR_BODY_READ_FAILED,
+		})
+	}
 
-	apiDomain, ok := domains.DomainsMap.Load(apiQueryDomain)
-	if !ok {
-		writer.Header().Set("Content-Type", "application/json")
-		fmt.Fprintf(writer, `{"success": false, "details":"DOMAIN_NOT_FOUND"}`)
+	defer request.Body.Close()
+
+	var apiRequest API_REQUEST
+	err = json.Unmarshal(reqBody, &apiRequest)
+	if err != nil {
+		APIResponse(writer, false, map[string]interface{}{
+			"ERROR": ERR_JSON_READ_FAILED,
+		})
 		return true
 	}
 
-	apiQueryAction := apiQuery.Get("action")
-	switch apiQueryAction {
-	case "TOTAL_REQUESTS":
-		writer.Header().Set("Content-Type", "application/json")
-		fmt.Fprintf(writer, `{"success":true,"results":{"REQUESTS_PER_SECOND":%d}}`, domainData.TotalRequests)
-	case "BYPASSED_REQUESTS":
-		writer.Header().Set("Content-Type", "application/json")
-		fmt.Fprintf(writer, `{"success":true,"results":{"REQUESTS_PER_SECOND":%d}}`, domainData.BypassedRequests)
-	case "TOTAL_REQUESTS_PER_SECOND":
-		writer.Header().Set("Content-Type", "application/json")
-		fmt.Fprintf(writer, `{"success":true,"results":{"REQUESTS_PER_SECOND":%d}}`, domainData.RequestsPerSecond)
-	case "BYPASSED_REQUESTS_PER_SECOND":
-		writer.Header().Set("Content-Type", "application/json")
-		fmt.Fprintf(writer, `{"success":true,"results":{"REQUESTS_PER_SECOND":%d}}`, domainData.RequestsBypassedPerSecond)
-	case "PROXY_STATS":
-		writer.Header().Set("Content-Type", "application/json")
-		fmt.Fprintf(writer, `{"success":true,"results":{"CPU_USAGE":"%s","RAM_USAGE": "%s"}}`, proxy.CpuUsage, proxy.RamUsage)
-	case "PROXY_STATS_CPU_USAGE":
-		writer.Header().Set("Content-Type", "application/json")
-		fmt.Fprintf(writer, `{"success":true,"results":{"CPU_USAGE":"%s"}}`, proxy.CpuUsage)
-	case "PROXY_STATS_RAM_USAGE":
-		writer.Header().Set("Content-Type", "application/json")
-		fmt.Fprintf(writer, `{"success":true,"results":{"RAM_USAGE":"%s"}}`, proxy.RamUsage)
+	//Proxy specific requests
+	if apiRequest.Domain == "" {
+		switch apiRequest.Action {
+		case "GET_PROXY_STATS":
+			APIResponse(writer, true, map[string]interface{}{
+				"CPU_USAGE": proxy.CpuUsage,
+				"RAM_USAGE": proxy.RamUsage,
+			})
+		case "GET_PROXY_STATS_CPU_USAGE":
+			APIResponse(writer, true, map[string]interface{}{
+				"CPU_USAGE": proxy.CpuUsage,
+			})
+		case "GET_PROXY_STATS_RAM_USAGE":
+			APIResponse(writer, true, map[string]interface{}{
+				"RAM_USAGE": proxy.RamUsage,
+			})
+		case "GET_IP_REQUESTS":
+			firewall.Mutex.Lock()
+			ipsAll := firewall.AccessIps
+			ipsCookie := firewall.AccessIpsCookie
+			firewall.Mutex.Unlock()
+
+			APIResponse(writer, true, map[string]interface{}{
+				"TOTAL_IP_REQUESTS":     ipsAll,
+				"CHALLENGE_IP_REQUESTS": ipsCookie,
+			})
+		//Only returns UNK Fingerprints
+		case "GET_FINGERPRINT_REQUESTS":
+			firewall.Mutex.Lock()
+			ipsFps := firewall.UnkFps
+			firewall.Mutex.Unlock()
+
+			APIResponse(writer, true, map[string]interface{}{
+				"TOTAL_FINGERPRINT_REQUESTS": ipsFps,
+			})
+		default:
+			APIResponse(writer, false, map[string]interface{}{
+				"ERROR": ERR_ACTION_NOT_FOUND,
+			})
+		}
+		return true
+	}
+
+	apiDomain, ok := domains.DomainsMap.Load(apiRequest.Domain)
+	if !ok {
+		APIResponse(writer, false, map[string]interface{}{
+			"ERROR": ERR_DOMAIN_NOT_FOUND,
+		})
+		return true
+	}
+
+	//Domain specific requests
+	switch apiRequest.Action {
+	case "GET_TOTAL_REQUESTS":
+		APIResponse(writer, true, map[string]interface{}{
+			"TOTAL_REQUESTS": domainData.TotalRequests,
+		})
+	case "GET_BYPASSED_REQUESTS":
+		APIResponse(writer, true, map[string]interface{}{
+			"BYPASSED_REQUESTS": domainData.BypassedRequests,
+		})
+	case "GET_TOTAL_REQUESTS_PER_SECOND":
+		APIResponse(writer, true, map[string]interface{}{
+			"TOTAL_REQUESTS_REQUESTS_PER_SECOND": domainData.RequestsPerSecond,
+		})
+	case "GET_BYPASSED_REQUESTS_PER_SECOND":
+		APIResponse(writer, true, map[string]interface{}{
+			"BYPASSED_REQUESTS_REQUESTS_PER_SECOND": domainData.RequestsBypassedPerSecond,
+		})
 	case "GET_FIREWALL_RULES":
-		writer.Header().Set("Content-Type", "application/json")
-		allRules := ``
-		for _, rule := range apiDomain.(domains.DomainSettings).RawCustomRules {
-			allRules += `{"expression":"` + utils.JsonEscape(rule.Expression) + `", "action":"` + utils.JsonEscape(rule.Action) + `"},`
-		}
-		allRules = strings.TrimSuffix(allRules, ",")
-		fmt.Fprintf(writer, `{"success":true,"results":{"RULES":[%s]}}`, allRules)
+		APIResponse(writer, true, map[string]interface{}{
+			"FIREWALL_RULES": apiDomain.(domains.DomainSettings).RawCustomRules,
+		})
 	case "GET_CACHE_RULES":
-		writer.Header().Set("Content-Type", "application/json")
-		allRules := ``
-		for _, rule := range apiDomain.(domains.DomainSettings).RawCacheRules {
-			allRules += `{"expression":"` + utils.JsonEscape(rule.Expression) + `", "action":"` + utils.JsonEscape(rule.Action) + `"},`
-		}
-		allRules = strings.TrimSuffix(allRules, ",")
-		fmt.Fprintf(writer, `{"success":true,"results":{"RULES":[%s]}}`, allRules)
+		APIResponse(writer, true, map[string]interface{}{
+			"CACHE_RULES": apiDomain.(domains.DomainSettings).RawCacheRules,
+		})
 	default:
-		writer.Header().Set("Content-Type", "application/json")
-		fmt.Fprintf(writer, `{"success":false,"details":"ACTION_NOT_FOUND"}`)
+		APIResponse(writer, false, map[string]interface{}{
+			"ERROR": ERR_ACTION_NOT_FOUND,
+		})
 	}
 	return true
+}
+
+func APIResponse(writer http.ResponseWriter, success bool, response map[string]interface{}) error {
+
+	writer.Header().Set("Content-Type", "application/json")
+
+	apiResponse := API_RESPONSE{
+		Success:  success,
+		Response: response,
+	}
+
+	jsonResponse, err := json.Marshal(apiResponse)
+	if err != nil {
+		return err
+	}
+
+	fmt.Fprint(writer, string(jsonResponse))
+	return nil
 }
