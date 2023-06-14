@@ -2,6 +2,10 @@ package proxy
 
 import "time"
 
+const (
+	ProxyVersion float64 = 1.4
+)
+
 var (
 	WatchedDomain string
 	TWidth        int

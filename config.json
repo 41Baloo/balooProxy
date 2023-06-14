@@ -4,7 +4,7 @@
         "cloudflare": true,
         "maxLogLength": 5,
         "adminsecret": "CHANGE_ME",
-        "apisecret": "CHANGE_NE",
+        "apisecret": "CHANGE_ME",
         "secrets": {
             "captcha": "CHANGE_ME1",
             "cookie": "CHANGE_ME2",

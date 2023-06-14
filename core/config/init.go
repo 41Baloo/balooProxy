@@ -3,12 +3,16 @@ package config
 import (
 	"crypto/tls"
 	"encoding/json"
+	"errors"
+	"fmt"
 	"goProxy/core/db"
 	"goProxy/core/domains"
 	"goProxy/core/firewall"
 	"goProxy/core/proxy"
 	"goProxy/core/server"
 	"goProxy/core/utils"
+	"io/ioutil"
+	"net/http"
 	"net/http/httputil"
 	"net/url"
 	"os"
@@ -33,10 +37,29 @@ func Load() {
 	proxy.Cloudflare = domains.Config.Proxy.Cloudflare
 
 	proxy.CookieSecret = domains.Config.Proxy.Secrets["cookie"]
+	if strings.Contains(proxy.CookieSecret, "CHANGE_ME") {
+		panic("[ " + utils.RedText("!") + " ] [ Cookie Secret Contains 'CHANGE_ME', Refusing To Load ]")
+	}
+
 	proxy.JSSecret = domains.Config.Proxy.Secrets["javascript"]
+	if strings.Contains(proxy.JSSecret, "CHANGE_ME") {
+		panic("[ " + utils.RedText("!") + " ] [ JS Secret Contains 'CHANGE_ME', Refusing To Load ]")
+	}
+
 	proxy.CaptchaSecret = domains.Config.Proxy.Secrets["captcha"]
+	if strings.Contains(proxy.CaptchaSecret, "CHANGE_ME") {
+		panic("[ " + utils.RedText("!") + " ] [ Captcha Secret Contains 'CHANGE_ME', Refusing To Load ]")
+	}
+
 	proxy.AdminSecret = domains.Config.Proxy.AdminSecret
+	if strings.Contains(proxy.AdminSecret, "CHANGE_ME") {
+		panic("[ " + utils.RedText("!") + " ] [ Admin Secret Contains 'CHANGE_ME', Refusing To Load ]")
+	}
+
 	proxy.APISecret = domains.Config.Proxy.APISecret
+	if strings.Contains(proxy.APISecret, "CHANGE_ME") {
+		panic("[ " + utils.RedText("!") + " ] [ API Secret Contains 'CHANGE_ME'. Refusing To Load ]")
+	}
 
 	// Check if the Proxy Timeout Config has been set otherwise use default values
 
@@ -174,6 +197,11 @@ func Load() {
 		firewall.Mutex.Unlock()
 	}
 
+	vcErr := VersionCheck()
+	if vcErr != nil {
+		panic("[ " + utils.RedText("!") + " ] [ " + vcErr.Error() + " ]")
+	}
+
 	if len(domains.Domains) == 0 {
 		AddDomain()
 		Load()
@@ -181,4 +209,34 @@ func Load() {
 		proxy.WatchedDomain = domains.Domains[0]
 		db.Connect()
 	}
+}
+
+func VersionCheck() error {
+	resp, err := http.Get("https://raw.githubusercontent.com/41Baloo/balooProxy/main/global/proxy/version.json")
+	if err != nil {
+		return errors.New("Failed to check for proxy version: " + err.Error())
+	}
+	defer resp.Body.Close()
+
+	body, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return errors.New("Failed to check for proxy version: " + err.Error())
+	}
+
+	var proxyVersions GLOBAL_PROXY_VERSIONS
+	err = json.Unmarshal(body, &proxyVersions)
+	if err != nil {
+		return errors.New("Failed to check for proxy version: " + err.Error())
+	}
+
+	if proxyVersions.StableVersion > proxy.ProxyVersion {
+
+		fmt.Println("[ " + utils.RedText("!") + " ] [ New Proxy Version " + fmt.Sprint(proxyVersions.StableVersion) + " Found. You Are using " + fmt.Sprint(proxy.ProxyVersion) + ". Consider Downloading The New Version From Github Or " + proxyVersions.Download + " ]")
+		fmt.Println("[ " + utils.RedText("+") + " ] [ Automatically Starting Proxy In 10 Seconds ]")
+
+		time.Sleep(10 * time.Second)
+
+	}
+
+	return nil
 }
