@@ -85,7 +85,7 @@ func Middleware(writer http.ResponseWriter, request *http.Request) {
 	domains.DomainsData[domainName] = domainData
 	firewall.Mutex.Unlock()
 
-	writer.Header().Set("baloo-Proxy", "1.3")
+	writer.Header().Set("baloo-Proxy", "1.4")
 
 	//Start the suspicious level where the stage currently is
 	susLv := domainData.Stage
