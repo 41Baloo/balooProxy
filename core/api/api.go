@@ -6,6 +6,7 @@ import (
 	"goProxy/core/domains"
 	"goProxy/core/firewall"
 	"goProxy/core/proxy"
+	"goProxy/core/utils"
 	"io"
 	"net/http"
 )
@@ -71,6 +72,25 @@ func Process(writer http.ResponseWriter, request *http.Request, domainData domai
 			APIResponse(writer, true, map[string]interface{}{
 				"TOTAL_FINGERPRINT_REQUESTS": ipsFps,
 			})
+		case "GET_IP_CACHE":
+			cacheIps := make(map[string]interface{})
+			firewall.CacheIps.Range(func(key, value any) bool {
+				cacheIps[fmt.Sprint(key)] = value
+				return true
+			})
+
+			APIResponse(writer, true, map[string]interface{}{
+				"IP_CACHE": cacheIps,
+			})
+		// Useful to fill up your ipCache and see how your proxy performs with high memory usage
+		case "FILL_IP_CACHE":
+			firewall.Mutex.Lock()
+			for i := 0; i < 19980; i++ {
+				firewall.CacheIps.Store(utils.RandomString(24), utils.RandomString(64))
+			}
+			firewall.Mutex.Unlock()
+
+			APIResponse(writer, true, map[string]interface{}{})
 		default:
 			APIResponse(writer, false, map[string]interface{}{
 				"ERROR": ERR_ACTION_NOT_FOUND,

@@ -73,6 +73,7 @@ func Fingerprint(clientHello *tls.ClientHelloInfo) (*tls.Config, error) {
 
 	//Ignore ratelimited Ips
 	if ipCount > proxy.IPRatelimit || ipCountCookie > proxy.FailChallengeRatelimit {
+		defer clientHello.Conn.Close()
 		return nil, nil
 	}
 
