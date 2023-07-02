@@ -546,13 +546,11 @@ func clearProxyCache() {
 
 		proxyCpuUsage, pcuErr := strconv.ParseFloat(proxy.CpuUsage, 32)
 		if pcuErr != nil {
-			fmt.Println("[ ERROR READING CPU USAGE ]: " + pcuErr.Error())
 			proxyCpuUsage = 0
 		}
 
 		proxyMemUsage, pmuErr := strconv.ParseFloat(proxy.RamUsage, 32)
 		if pmuErr != nil {
-			fmt.Println("[ ERROR READING MEM USAGE ]: " + pmuErr.Error())
 			proxyMemUsage = 0
 		}
 
