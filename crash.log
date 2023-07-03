@@ -98,3 +98,55 @@ goProxy/core/server.Monitor()
 created by main.main
 	/workspaces/balooProxy/main.go:30 +0xf1
 
+[ 10:17:09 ]: Caught Panic: [ [31m![0m ] [ Cookie Secret Contains 'CHANGE_ME', Refusing To Load ]
+
+goroutine 1 [running]:
+goProxy/core/pnc.PanicHndl()
+	/workspaces/balooProxy/core/pnc/panicHandler.go:26 +0x7a
+panic({0x7351c0, 0xc0000932a0})
+	/usr/local/go/src/runtime/panic.go:884 +0x212
+goProxy/core/config.Load()
+	/workspaces/balooProxy/core/config/init.go:41 +0x1774
+main.main()
+	/workspaces/balooProxy/main.go:31 +0x10e
+
+[ 10:37:09 ]: Caught Panic: interface conversion: interface {} is nil, not domains.DomainSettings
+
+goroutine 27 [running]:
+goProxy/core/pnc.PanicHndl()
+	/workspaces/balooProxy/core/pnc/panicHandler.go:26 +0x7a
+panic({0x74b1e0, 0xc00046e7e0})
+	/usr/local/go/src/runtime/panic.go:884 +0x212
+goProxy/core/server.checkAttack({0x79b057, 0x9}, {0x0, 0x0, 0x0, 0x0, {0xc00041e330, 0x1, 0x1}, 0x0, ...})
+	/workspaces/balooProxy/core/server/monitor.go:121 +0x86d
+goProxy/core/server.Monitor()
+	/workspaces/balooProxy/core/server/monitor.go:83 +0x705
+created by main.main
+	/workspaces/balooProxy/main.go:34 +0x126
+
+[ 10:23:10 ]: Caught Panic: interface conversion: interface {} is nil, not domains.DomainSettings
+
+goroutine 11 [running]:
+goProxy/core/pnc.PanicHndl()
+	/workspaces/balooProxy/core/pnc/panicHandler.go:26 +0x7a
+panic({0x74b1e0, 0xc000476990})
+	/usr/local/go/src/runtime/panic.go:884 +0x212
+goProxy/core/server.checkAttack({0x79b057, 0x9}, {0x0, 0x0, 0x0, 0x0, {0xc000478420, 0x1, 0x1}, 0x0, ...})
+	/workspaces/balooProxy/core/server/monitor.go:121 +0x86d
+goProxy/core/server.Monitor()
+	/workspaces/balooProxy/core/server/monitor.go:83 +0x705
+created by main.main
+	/workspaces/balooProxy/main.go:34 +0x126
+
+[ 10:28:13 ]: Caught Panic: YES. REACHED
+
+goroutine 1 [running]:
+goProxy/core/pnc.PanicHndl()
+	/workspaces/balooProxy/core/pnc/panicHandler.go:26 +0x7a
+panic({0x7351c0, 0x839fb0})
+	/usr/local/go/src/runtime/panic.go:884 +0x212
+goProxy/core/utils.AddLogs({0xc0002e4470, 0x2}, {0x79b057, 0x9})
+	/workspaces/balooProxy/core/utils/text.go:25 +0x67e
+main.main()
+	/workspaces/balooProxy/main.go:39 +0x1c6
+

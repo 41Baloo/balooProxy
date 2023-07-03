@@ -21,13 +21,18 @@ func AddLogs(entry string, domainName string) domains.DomainData {
 
 	domainData := domains.DomainsData[domainName]
 
-	if len(domainData.LastLogs) > proxy.MaxLogLength {
-		domainData.LastLogs = domainData.LastLogs[1:]
-		domainData.LastLogs = append(domainData.LastLogs, entry)
+	//Calculate how close we are to overflowing
+	logOverflow := len(domainData.LastLogs) - proxy.MaxLogLength
+
+	if logOverflow > 0 {
+
+		// Remove overflown element(s) and append new log entry
+		domainData.LastLogs = append(domainData.LastLogs[logOverflow:], entry)
 
 		if proxy.RealTimeLogs {
 			PrintMutex.Lock()
 			for i, log := range domainData.LastLogs {
+				// Check if out log is too big to display fully
 				if len(log)+4 > proxy.TWidth {
 					fmt.Print("\033[" + fmt.Sprint(11+i) + ";1H\033[K[" + RedText("!") + "] " + log[:len(log)-(len(log)+4-proxy.TWidth)] + " ...\033[0m\n")
 				} else {
@@ -37,6 +42,9 @@ func AddLogs(entry string, domainName string) domains.DomainData {
 			MoveInputLine()
 			PrintMutex.Unlock()
 		}
+
+		domains.DomainsData[domainName] = domainData
+
 		return domainData
 	}
 	domainData.LastLogs = append(domainData.LastLogs, entry)
