@@ -19,9 +19,15 @@ func Generate() {
 
 	gConfig := domains.Configuration{
 		Proxy: domains.Proxy{
-			Cloudflare:   utils.AskBool("Use This Proxy With Cloudflare? (y/N)", false),
-			AdminSecret:  utils.RandomString(25),
-			APISecret:    utils.RandomString(30),
+			Cloudflare:  utils.AskBool("Use This Proxy With Cloudflare? (y/N)", false),
+			AdminSecret: utils.RandomString(25),
+			APISecret:   utils.RandomString(30),
+			Timeout: domains.TimeoutSettings{
+				Idle:       utils.AskInt("How Many Seconds Should An Indle Connection Be Kept Open?", 3),
+				Read:       utils.AskInt("How Many Seconds Should A Reading Connection Be Kept Open?", 5),
+				Write:      utils.AskInt("How Many Seconds Should A Writing Connection Be Kept Open?", 5),
+				ReadHeader: utils.AskInt("How Many Seconds Should Be Allowed To Read A Connections Header?", 5),
+			},
 			Secrets: map[string]string{
 				"cookie":     utils.RandomString(20),
 				"javascript": utils.RandomString(20),

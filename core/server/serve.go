@@ -33,8 +33,8 @@ func Serve() {
 			MaxHeaderBytes:    1 << 20,
 		}
 
+		service.SetKeepAlivesEnabled(true)
 		service.Handler = http.HandlerFunc(Middleware)
-		//service.SetKeepAlivesEnabled(false)
 
 		if err := service.ListenAndServe(); err != nil {
 			panic(err)
@@ -85,8 +85,8 @@ func Serve() {
 		})
 		//service.SetKeepAlivesEnabled(false)
 
+		service.SetKeepAlivesEnabled(true)
 		serviceH.Handler = http.HandlerFunc(Middleware)
-		//serviceH.SetKeepAlivesEnabled(false)
 
 		go func() {
 			defer pnc.PanicHndl()
@@ -145,7 +145,7 @@ func (rt *RoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
 				cachedResp := cacheResponse.(domains.CacheResponse)
 
 				//Check if cache is expired
-				if cachedResp.Timestamp > int(time.Now().Unix()) {
+				if cachedResp.Timestamp > int(proxy.LastSecondTime.Unix()) {
 
 					resp := &http.Response{
 						StatusCode: cachedResp.Status,
@@ -431,7 +431,7 @@ func (rt *RoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
 
 			domains.DomainsCache.Store(cacheKey, domains.CacheResponse{
 				Domain:    resp.Request.Host,
-				Timestamp: int(time.Now().Unix()) + 3600, //Cache for an hour
+				Timestamp: int(proxy.LastSecondTime.Unix()) + 3600, //Cache for an hour
 				Status:    resp.StatusCode,
 				Headers:   resp.Header,
 				Body:      bodyBytes,

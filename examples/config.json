@@ -1,14 +1,13 @@
 {
     "proxy": {
-        "version": 1.2,
         "cloudflare": true,
         "maxLogLength": 5,
         "adminsecret": "CHANGE_ME",
         "apisecret": "CHANGE_ME",
         "secrets": {
-            "captcha": "CHANGE_ME1",
-            "cookie": "CHANGE_ME2",
-            "javascript": "CHANGE_ME3"
+            "captcha": "CHANG_ME1",
+            "cookie": "CHANG_ME2",
+            "javascript": "HANGE_ME3"
         },
         "timeout": {
             "idle": 5,

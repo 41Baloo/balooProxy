@@ -151,7 +151,8 @@ func checkAttack(domainName string, domainData domains.DomainData) {
 
 func printStats() {
 
-	proxy.CurrHour, _, _ = time.Now().Clock()
+	proxy.LastSecondTime = time.Now()
+	proxy.CurrHour, _, _ = proxy.LastSecondTime.Clock()
 
 	result, err := cpu.Percent(0, false)
 	if err != nil {
@@ -179,7 +180,7 @@ func printStats() {
 	domainData := domains.DomainsData[proxy.WatchedDomain]
 	firewall.Mutex.Unlock()
 
-	if domainData.Stage == 0 {
+	if domainData.Stage == 0 && proxy.WatchedDomain != "debug" {
 		if proxy.WatchedDomain != "" {
 			fmt.Println("[" + utils.RedText("!") + "] [ " + utils.RedText("Domain \""+proxy.WatchedDomain+"\" Not Found") + " ]")
 			fmt.Println("")
@@ -200,7 +201,7 @@ func printStats() {
 		fmt.Println("[" + utils.RedText("+") + "] [ " + utils.RedText("domain") + " ]: " + utils.RedText("Usage: ") + "domain [name] " + utils.RedText("Switch between your domains. Type only ") + "domain " + utils.RedText("to list all available domains"))
 		fmt.Println("[" + utils.RedText("+") + "] [ " + utils.RedText("add") + " ]: " + utils.RedText("Usage: ") + "add " + utils.RedText("Starts a dialouge to add another domain to the proxy"))
 		fmt.Println("[" + utils.RedText("+") + "] [ " + utils.RedText("rtlogs") + " ]: " + utils.RedText("Usage: ") + "rtlogs " + utils.RedText("Toggels 'Real-Time-Logs' on and off. It is suggested to keep off"))
-		fmt.Println("[" + utils.RedText("+") + "] [ " + utils.RedText("rtlogs") + " ]: " + utils.RedText("Usage: ") + "clrlogs " + utils.RedText("Clears all logs for the current domain"))
+		fmt.Println("[" + utils.RedText("+") + "] [ " + utils.RedText("clrlogs") + " ]: " + utils.RedText("Usage: ") + "clrlogs " + utils.RedText("Clears all logs for the current domain"))
 		fmt.Println("[" + utils.RedText("+") + "] [ " + utils.RedText("cachemode") + " ]: " + utils.RedText("Usage: ") + "cachemode " + utils.RedText("Toggels whether or not the proxy tries to cache on and off"))
 		fmt.Println("[" + utils.RedText("+") + "] [ " + utils.RedText("delcache") + " ]: " + utils.RedText("Usage: ") + "delcache " + utils.RedText("Clears the cache for the current domain"))
 		fmt.Println("[" + utils.RedText("+") + "] [ " + utils.RedText("reload") + " ]: " + utils.RedText("Usage: ") + "reload " + utils.RedText("Reload your proxy in order for changes in your ") + "config.json " + utils.RedText("to take effect"))
@@ -549,22 +550,24 @@ func clearProxyCache() {
 			proxyCpuUsage = 0
 		}
 
+		utils.AddLogs("Calculated CPU To Be "+fmt.Sprint(proxyCpuUsage), "debug")
+
 		proxyMemUsage, pmuErr := strconv.ParseFloat(proxy.RamUsage, 32)
 		if pmuErr != nil {
 			proxyMemUsage = 0
 		}
 
+		utils.AddLogs("Calculated Memory To Be "+fmt.Sprint(proxyMemUsage), "debug")
+
 		// Only clear if proxy isnt under attack / memory is running out
-		ipCacheLen := 0
-		firewall.CacheIps.Range(func(key, value any) bool {
-			ipCacheLen++
-			return true
-		})
-		if proxyCpuUsage < 15 || proxyMemUsage > 95 {
+		if (proxyCpuUsage < 15 && proxyMemUsage > 25) || proxyMemUsage > 95 {
 			firewall.CacheIps.Range(func(key, value any) bool {
 				firewall.CacheIps.Delete(key)
 				return true
 			})
+			utils.AddLogs("Cleared Cached IPs", "debug")
+		} else {
+			utils.AddLogs("Did Not Clear Cached IPs", "debug")
 		}
 		// Same for here
 		imgCachelen := 0
@@ -572,11 +575,14 @@ func clearProxyCache() {
 			imgCachelen++
 			return true
 		})
-		if proxyCpuUsage < 15 || proxyMemUsage > 95 {
+		if (proxyCpuUsage < 15 && proxyMemUsage > 25) || proxyMemUsage > 95 {
 			firewall.CacheImgs.Range(func(key, value any) bool {
 				firewall.CacheImgs.Delete(key)
 				return true
 			})
+			utils.AddLogs("Cleared Cached Captchas", "debug")
+		} else {
+			utils.AddLogs("Did Not Clear Cached Captchas", "debug")
 		}
 		firewall.Mutex.Unlock()
 		time.Sleep(2 * time.Minute)
@@ -607,6 +613,11 @@ func clearOutdatedCache() {
 			return true
 		})
 		reloadConfig()
+
+		firewall.Mutex.Lock()
+		utils.AddLogs("Cleared Outdated Cache", "debug")
+		firewall.Mutex.Unlock()
+
 		time.Sleep(5 * time.Hour)
 	}
 }
@@ -618,6 +629,7 @@ func generateOTPSecrets() {
 	//You can change this to use hours as the hash key, to make it even more secure against offline bruteforcing, however, if you use multiple servers make sure they all start within the same timeframe, e.g.
 	//Server1 starts at 23:59:50, Server2 starts at 00:00:01. In this case the keys are mismatched and clients would have to solve challenges again whenever they access a different server than before.
 	//To avoid this and help you, this function runs every minute, reducing this offset to only 1 minute maximum of mismatch per day
+	//This has now been changed to an hour, for better performance
 
 	for {
 
@@ -628,6 +640,10 @@ func generateOTPSecrets() {
 		proxy.JSOTP = utils.EncryptSha(proxy.JSSecret, currDate)
 		proxy.CaptchaOTP = utils.EncryptSha(proxy.CaptchaSecret, currDate)
 
-		time.Sleep(1 * time.Minute)
+		firewall.Mutex.Lock()
+		utils.AddLogs("Generated OTP Secrets", "debug")
+		firewall.Mutex.Unlock()
+
+		time.Sleep(1 * time.Hour)
 	}
 }

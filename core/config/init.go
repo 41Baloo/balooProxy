@@ -197,6 +197,32 @@ func Load() {
 		firewall.Mutex.Unlock()
 	}
 
+	domains.DomainsMap.Store("debug", domains.DomainSettings{
+		Name: "debug",
+	})
+
+	firewall.Mutex.Lock()
+	domains.DomainsData["debug"] = domains.DomainData{
+		Stage:            0,
+		StageManuallySet: false,
+		RawAttack:        false,
+		BypassAttack:     false,
+		LastLogs:         []string{},
+
+		TotalRequests:    0,
+		BypassedRequests: 0,
+
+		PrevRequests: 0,
+		PrevBypassed: 0,
+
+		RequestsPerSecond:             0,
+		RequestsBypassedPerSecond:     0,
+		PeakRequestsPerSecond:         0,
+		PeakRequestsBypassedPerSecond: 0,
+		RequestLogger:                 []domains.RequestLog{},
+	}
+	firewall.Mutex.Unlock()
+
 	vcErr := VersionCheck()
 	if vcErr != nil {
 		panic("[ " + utils.RedText("!") + " ] [ " + vcErr.Error() + " ]")

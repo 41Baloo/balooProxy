@@ -60,7 +60,8 @@ var (
 	//IP
 	CACHE_CLIENTIP = 7
 
-	CurrHour int
+	CurrHour       int
+	LastSecondTime time.Time
 
 	CacheEnabled = false
 )

@@ -20,7 +20,6 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
-	"time"
 
 	"github.com/kor44/gofilter"
 )
@@ -484,13 +483,13 @@ func Middleware(writer http.ResponseWriter, request *http.Request) {
 
 	//Access logs of clients that passed the challenge
 	if browser != "" || botFp != "" {
-		access := "[ " + utils.RedText(time.Now().Format("15:04:05")) + " ] > \033[35m" + ip + "\033[0m - \033[32m" + browser + botFp + "\033[0m - " + utils.RedText(request.UserAgent()) + " - " + utils.RedText(request.RequestURI)
+		access := "[ " + utils.RedText(proxy.LastSecondTime.Format("15:04:05")) + " ] > \033[35m" + ip + "\033[0m - \033[32m" + browser + botFp + "\033[0m - " + utils.RedText(request.UserAgent()) + " - " + utils.RedText(request.RequestURI)
 		firewall.Mutex.Lock()
 		domainData = utils.AddLogs(access, domainName)
 		firewall.AccessIps[ip] = firewall.AccessIps[ip] + 1
 		firewall.Mutex.Unlock()
 	} else {
-		access := "[ " + utils.RedText(time.Now().Format("15:04:05")) + " ] > \033[35m" + ip + "\033[0m - \033[31mUNK (" + tlsFp + ")\033[0m - " + utils.RedText(request.UserAgent()) + " - " + utils.RedText(request.RequestURI)
+		access := "[ " + utils.RedText(proxy.LastSecondTime.Format("15:04:05")) + " ] > \033[35m" + ip + "\033[0m - \033[31mUNK (" + tlsFp + ")\033[0m - " + utils.RedText(request.UserAgent()) + " - " + utils.RedText(request.RequestURI)
 		firewall.Mutex.Lock()
 		domainData = utils.AddLogs(access, domainName)
 		firewall.AccessIps[ip] = firewall.AccessIps[ip] + 1
