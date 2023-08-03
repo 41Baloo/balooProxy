@@ -19,10 +19,12 @@ import (
 	"strings"
 	"time"
 
+	"github.com/gofiber/fiber/v2/middleware/adaptor"
 	"github.com/kor44/gofilter"
 )
 
 func Load() {
+
 	file, err := os.Open("config.json")
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -137,6 +139,8 @@ func Load() {
 		})
 		dProxy.Transport = &server.RoundTripper{}
 
+		dProxyHandler := adaptor.HTTPHandler(dProxy)
+
 		var cert tls.Certificate = tls.Certificate{}
 		if !proxy.Cloudflare {
 			var certErr error
@@ -156,7 +160,7 @@ func Load() {
 			CacheRules:    cacheRules,
 			RawCacheRules: rawCacheRules,
 
-			DomainProxy:        dProxy,
+			DomainProxy:        dProxyHandler,
 			DomainCertificates: cert,
 			DomainWebhooks: domains.WebhookSettings{
 				URL:            domain.Webhook.URL,
@@ -207,6 +211,7 @@ func Load() {
 		StageManuallySet: false,
 		RawAttack:        false,
 		BypassAttack:     false,
+		BufferCooldown:   0,
 		LastLogs:         []string{},
 
 		TotalRequests:    0,
@@ -221,6 +226,7 @@ func Load() {
 		PeakRequestsBypassedPerSecond: 0,
 		RequestLogger:                 []domains.RequestLog{},
 	}
+
 	firewall.Mutex.Unlock()
 
 	vcErr := VersionCheck()

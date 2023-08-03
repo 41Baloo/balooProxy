@@ -57,7 +57,17 @@ var (
 func Fingerprint(clientHello *tls.ClientHelloInfo) (*tls.Config, error) {
 
 	//Invalid TLS
-	if len(clientHello.CipherSuites[1:]) == 0 {
+	if !(len(clientHello.CipherSuites) > 0) {
+		defer clientHello.Conn.Close()
+		return nil, nil
+	}
+
+	if !(len(clientHello.SupportedCurves) > 0) {
+		defer clientHello.Conn.Close()
+		return nil, nil
+	}
+
+	if !(len(clientHello.SupportedPoints) > 0) {
 		defer clientHello.Conn.Close()
 		return nil, nil
 	}

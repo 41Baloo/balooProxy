@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"goProxy/core/config"
 	"goProxy/core/pnc"
 	"goProxy/core/server"
@@ -24,10 +25,16 @@ func main() {
 	//Disable Error Logging
 	log.SetOutput(io.Discard)
 
+	fmt.Println("Starting Proxy ...")
+
 	config.Load()
+
+	fmt.Println("Loaded Config ...")
 
 	go server.Serve()
 	go server.Monitor()
+
+	fmt.Println("Started!")
 
 	//Keep server running
 	select {}

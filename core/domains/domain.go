@@ -3,10 +3,10 @@ package domains
 import (
 	"crypto/tls"
 	"net/http"
-	"net/http/httputil"
 	"sync"
 	"time"
 
+	"github.com/gofiber/fiber/v2"
 	"github.com/kor44/gofilter"
 )
 
@@ -50,7 +50,7 @@ type DomainSettings struct {
 	CacheRules    []Rule
 	RawCacheRules []JsonRule
 
-	DomainProxy        *httputil.ReverseProxy
+	DomainProxy        func(*fiber.Ctx) error
 	DomainCertificates tls.Certificate
 	DomainWebhooks     WebhookSettings
 
@@ -67,7 +67,9 @@ type DomainData struct {
 	StageManuallySet bool
 	RawAttack        bool
 	BypassAttack     bool
-	LastLogs         []string
+	BufferCooldown   int
+
+	LastLogs []string
 
 	TotalRequests    int
 	BypassedRequests int
@@ -83,12 +85,12 @@ type DomainData struct {
 }
 
 type Proxy struct {
-	Cloudflare   bool              `json:"cloudflare"`
-	AdminSecret  string            `json:"adminsecret"`
-	APISecret    string            `json:"apisecret"`
-	Secrets      map[string]string `json:"secrets"`
-	Timeout      TimeoutSettings   `json:"timeout"`
-	Ratelimits   map[string]int    `json:"ratelimits"`
+	Cloudflare  bool              `json:"cloudflare"`
+	AdminSecret string            `json:"adminsecret"`
+	APISecret   string            `json:"apisecret"`
+	Secrets     map[string]string `json:"secrets"`
+	Timeout     TimeoutSettings   `json:"timeout"`
+	Ratelimits  map[string]int    `json:"ratelimits"`
 }
 
 type TimeoutSettings struct {

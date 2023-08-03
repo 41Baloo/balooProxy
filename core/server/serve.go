@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"crypto/tls"
-	"fmt"
 	"goProxy/core/domains"
 	"goProxy/core/firewall"
 	"goProxy/core/pnc"
@@ -16,86 +15,104 @@ import (
 	"strings"
 	"time"
 
+	"github.com/goccy/go-json"
+	"github.com/gofiber/fiber/v2"
 	"github.com/kor44/gofilter"
 )
+
+type callbackListener struct {
+	net.Listener
+}
+
+type callbackConn struct {
+	net.Conn
+}
+
+func (ln callbackListener) Accept() (net.Conn, error) {
+	conn, err := ln.Listener.Accept()
+	if err != nil {
+		return nil, err
+	}
+	return callbackConn{Conn: conn}, nil
+}
+
+func (c callbackConn) Close() error {
+	firewall.Mutex.Lock()
+	delete(firewall.Connections, c.RemoteAddr().String())
+	firewall.Mutex.Unlock()
+	return c.Conn.Close()
+}
 
 func Serve() {
 
 	defer pnc.PanicHndl()
 
+	fbConfig := fiber.Config{
+		DisableStartupMessage: true,
+		JSONEncoder:           json.Marshal,
+		JSONDecoder:           json.Unmarshal,
+		IdleTimeout:           proxy.IdleTimeoutDuration,
+		ReadTimeout:           proxy.ReadTimeoutDuration,
+		WriteTimeout:          proxy.WriteTimeoutDuration,
+	}
+
 	if domains.Config.Proxy.Cloudflare {
-		service := &http.Server{
-			IdleTimeout:       proxy.IdleTimeoutDuration,
-			ReadTimeout:       proxy.ReadTimeoutDuration,
-			WriteTimeout:      proxy.WriteTimeoutDuration,
-			ReadHeaderTimeout: proxy.ReadHeaderTimeoutDuration,
-			Addr:              ":80",
-			MaxHeaderBytes:    1 << 20,
-		}
 
-		service.SetKeepAlivesEnabled(true)
-		service.Handler = http.HandlerFunc(Middleware)
+		httpServer := fiber.New(fbConfig)
 
-		if err := service.ListenAndServe(); err != nil {
+		httpServer.Use(func(c *fiber.Ctx) error {
+			Middleware(c)
+
+			return nil
+		})
+
+		//service.Handler = http.HandlerFunc(Middleware)
+
+		if err := httpServer.Listen(":80"); err != nil {
 			panic(err)
 		}
 	} else {
-		service := &http.Server{
-			IdleTimeout:       proxy.IdleTimeoutDuration,
-			ReadTimeout:       proxy.ReadTimeoutDuration,
-			WriteTimeout:      proxy.WriteTimeoutDuration,
-			ReadHeaderTimeout: proxy.ReadHeaderTimeoutDuration,
-			ConnState:         firewall.OnStateChange,
-			Addr:              ":80",
-			MaxHeaderBytes:    1 << 20,
-		}
-		serviceH := &http.Server{
-			IdleTimeout:       proxy.IdleTimeoutDuration,
-			ReadTimeout:       proxy.ReadTimeoutDuration,
-			WriteTimeout:      proxy.WriteTimeoutDuration,
-			ReadHeaderTimeout: proxy.ReadHeaderTimeoutDuration,
-			ConnState:         firewall.OnStateChange,
-			Addr:              ":443",
-			TLSConfig: &tls.Config{
-				GetConfigForClient: firewall.Fingerprint,
-				GetCertificate:     domains.GetCertificate,
-				Renegotiation:      tls.RenegotiateOnceAsClient,
-			},
-			MaxHeaderBytes: 1 << 20,
-		}
 
-		service.Handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			firewall.Mutex.Lock()
-			domainData := domains.DomainsData[r.Host]
-			firewall.Mutex.Unlock()
-
-			if domainData.Stage == 0 {
-				w.Header().Set("Content-Type", "text/plain")
-				fmt.Fprintf(w, "balooProxy: "+r.Host+" does not exist. If you are the owner please check your config.json if you believe this is a mistake")
-				return
-			}
-
-			firewall.Mutex.Lock()
-			domainData = domains.DomainsData[r.Host]
-			domainData.TotalRequests++
-			domains.DomainsData[r.Host] = domainData
-			firewall.Mutex.Unlock()
-
-			http.Redirect(w, r, "https://"+r.Host+r.URL.Path+r.URL.RawQuery, http.StatusMovedPermanently)
+		// http to https server
+		httpServer := fiber.New(fbConfig)
+		httpServer.Use(func(c *fiber.Ctx) error {
+			return c.Redirect("https://"+c.Hostname()+c.OriginalURL(), fiber.StatusMovedPermanently)
 		})
-		//service.SetKeepAlivesEnabled(false)
 
-		service.SetKeepAlivesEnabled(true)
-		serviceH.Handler = http.HandlerFunc(Middleware)
+		// Main https server
+		httpsServer := fiber.New(fbConfig)
+
+		tlsHandler := &fiber.TLSHandler{}
+		serverListener, errListener := tls.Listen("tcp", ":443", &tls.Config{
+			GetConfigForClient: firewall.Fingerprint,
+			GetCertificate: func(chi *tls.ClientHelloInfo) (*tls.Certificate, error) {
+				tlsHandler.GetClientInfo(chi)
+				return domains.GetCertificate(chi)
+			},
+		})
+
+		loggingLn := callbackListener{Listener: serverListener}
+
+		if errListener != nil {
+			panic(errListener)
+		}
+
+		httpsServer.SetTLSHandler(tlsHandler)
+
+		httpsServer.Use(func(c *fiber.Ctx) error {
+			Middleware(c)
+
+			return nil
+		})
 
 		go func() {
 			defer pnc.PanicHndl()
-			if err := serviceH.ListenAndServeTLS("", ""); err != nil {
+			if err := httpsServer.Listener(loggingLn); err != nil {
 				panic(err)
 			}
 		}()
 
-		if err := service.ListenAndServe(); err != nil {
+		if err := httpServer.Listen(":80"); err != nil {
 			panic(err)
 		}
 	}
@@ -254,7 +271,6 @@ func (rt *RoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
 
 	//Connection was successfull, got bad response tho
 	if resp.StatusCode > 499 && resp.StatusCode < 600 {
-
 		errPage := `
 			<!DOCTYPE html>
 			<html>

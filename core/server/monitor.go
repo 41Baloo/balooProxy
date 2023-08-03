@@ -14,7 +14,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/inancgumus/screen"
+	"github.com/gofiber/fiber/v2/middleware/adaptor"
 	"github.com/kor44/gofilter"
 	"github.com/shirou/gopsutil/cpu"
 	"golang.org/x/term"
@@ -36,8 +36,7 @@ func Monitor() {
 	defer pnc.PanicHndl()
 
 	PrintMutex.Lock()
-	screen.Clear()
-	screen.MoveTopLeft()
+	fmt.Print("\033[2J")
 	PrintMutex.Unlock()
 
 	//Responsible for handeling user-commands
@@ -70,8 +69,7 @@ func Monitor() {
 				proxy.MaxLogLength = pHeight
 			}
 
-			screen.Clear()
-			screen.MoveTopLeft()
+			fmt.Print("\033[2J")
 			fmt.Println("\033[" + fmt.Sprint(12+proxy.MaxLogLength) + ";1H")
 			fmt.Print("[ " + utils.RedText("Command") + " ]: \033[s")
 		}
@@ -94,15 +92,20 @@ func Monitor() {
 // Only run this inside of a locked thread to avoid false reports
 func checkAttack(domainName string, domainData domains.DomainData) {
 
+	if domainName == "debug" {
+		return
+	}
+
 	domainData.RequestsPerSecond = domainData.TotalRequests - domainData.PrevRequests
 	domainData.RequestsBypassedPerSecond = domainData.BypassedRequests - domainData.PrevBypassed
 
 	domainData.PrevRequests = domainData.TotalRequests
 	domainData.PrevBypassed = domainData.BypassedRequests
 
-	if !domainData.StageManuallySet || domainData.BypassAttack {
+	if !domainData.StageManuallySet || (domainData.BufferCooldown > 0) {
 
-		if domainData.BypassAttack {
+		// Log requests if a bypassing or raw attack is ongoing
+		if domainData.BufferCooldown > 0 {
 			if domainData.RequestsPerSecond > domainData.PeakRequestsPerSecond {
 				domainData.PeakRequestsPerSecond = domainData.RequestsPerSecond
 			}
@@ -120,30 +123,82 @@ func checkAttack(domainName string, domainData domains.DomainData) {
 		settingQuery, _ := domains.DomainsMap.Load(domainName)
 		domainSettings := settingQuery.(domains.DomainSettings)
 
-		if domainData.Stage == 1 && domainData.RequestsBypassedPerSecond > domainSettings.BypassStage1 && !domainData.BypassAttack {
-			domainData.BypassAttack = true
-			domainData.Stage = 2
-			domainData.PeakRequestsPerSecond = domainData.RequestsPerSecond
-			domainData.PeakRequestsBypassedPerSecond = domainData.RequestsBypassedPerSecond
-			domainData.RequestLogger = append(domainData.RequestLogger, domains.RequestLog{
-				Time:     time.Now(),
-				Allowed:  domainData.RequestsBypassedPerSecond,
-				Total:    domainData.RequestsPerSecond,
-				CpuUsage: proxy.CpuUsage,
-			})
-			go utils.SendWebhook(domainData, domainSettings, int(0))
-		} else if domainData.Stage == 2 && domainData.RequestsBypassedPerSecond > domainSettings.BypassStage2 {
-			domainData.Stage = 3
-		} else if domainData.Stage == 3 && domainData.RequestsBypassedPerSecond < domainSettings.DisableBypassStage3 && domainData.RequestsPerSecond < domainSettings.DisableRawStage3 {
-			domainData.Stage = 2
-		} else if domainData.Stage == 2 && domainData.RequestsBypassedPerSecond < domainSettings.DisableBypassStage2 && domainData.RequestsPerSecond < domainSettings.DisableRawStage2 && domainData.BypassAttack {
-			domainData.BypassAttack = false
-			domainData.Stage = 1
-			go utils.SendWebhook(domainData, domainSettings, int(1))
-			domainData.PeakRequestsPerSecond = 0
-			domainData.PeakRequestsBypassedPerSecond = 0
-			domainData.RequestLogger = []domains.RequestLog{}
+		if !domainData.BypassAttack && !domainData.RawAttack && (domainData.BufferCooldown > 0) {
+			domainData.BufferCooldown--
+
+			if domainData.BufferCooldown == 0 {
+				utils.AddLogs("Attack Ending Webhook Sent", "debug")
+				go utils.SendWebhook(domainData, domainSettings, int(1))
+				domainData.PeakRequestsPerSecond = 0
+				domainData.PeakRequestsBypassedPerSecond = 0
+				domainData.RequestLogger = []domains.RequestLog{}
+			}
 		}
+
+		switch domainData.Stage {
+		case 1:
+			// A Bypassing Attack Started
+			if domainData.RequestsBypassedPerSecond > domainSettings.BypassStage1 && !domainData.BypassAttack {
+				utils.AddLogs("Bypassing Attack Started", "debug")
+				domainData.BypassAttack = true
+				domainData.Stage = 2
+				if domainData.BufferCooldown == 0 {
+					domainData.PeakRequestsPerSecond = domainData.RequestsPerSecond
+					domainData.PeakRequestsBypassedPerSecond = domainData.RequestsBypassedPerSecond
+					domainData.RequestLogger = append(domainData.RequestLogger, domains.RequestLog{
+						Time:     time.Now(),
+						Allowed:  domainData.RequestsBypassedPerSecond,
+						Total:    domainData.RequestsPerSecond,
+						CpuUsage: proxy.CpuUsage,
+					})
+					go utils.SendWebhook(domainData, domainSettings, int(0))
+				}
+				// Start/Set cooldown
+				domainData.BufferCooldown = 10
+			}
+		case 2:
+			// Stage 2 is getting bypassed
+			if domainData.RequestsBypassedPerSecond > domainSettings.BypassStage2 {
+				domainData.Stage = 3
+
+				// Stage 2 is no longer getting bypassed
+			} else if domainData.RequestsBypassedPerSecond < domainSettings.DisableBypassStage2 && domainData.RequestsPerSecond < domainSettings.DisableRawStage2 && domainData.BypassAttack {
+				utils.AddLogs("Bypassing Attack Ended", "debug")
+				domainData.BypassAttack = false
+				domainData.RawAttack = false
+				domainData.Stage = 1
+			}
+		case 3:
+			// Stage 3 is no longer getting bypassed
+			if domainData.RequestsBypassedPerSecond < domainSettings.DisableBypassStage3 && domainData.RequestsPerSecond < domainSettings.DisableRawStage3 {
+				domainData.Stage = 2
+			}
+		}
+
+		// An attack that didnt bypass was started
+		if domainData.RequestsPerSecond > domainSettings.DisableRawStage2 && !domainData.RawAttack && !domainData.BypassAttack {
+			utils.AddLogs("Raw Attack Started", "debug")
+			domainData.RawAttack = true
+
+			if domainData.BufferCooldown == 0 {
+				domainData.PeakRequestsPerSecond = domainData.RequestsPerSecond
+				domainData.PeakRequestsBypassedPerSecond = domainData.RequestsBypassedPerSecond
+				domainData.RequestLogger = append(domainData.RequestLogger, domains.RequestLog{
+					Time:     time.Now(),
+					Allowed:  domainData.RequestsBypassedPerSecond,
+					Total:    domainData.RequestsPerSecond,
+					CpuUsage: proxy.CpuUsage,
+				})
+				go utils.SendWebhook(domainData, domainSettings, int(0))
+			}
+
+			//Set/Start cooldown
+			domainData.BufferCooldown = 10
+		} else if domainData.RequestsPerSecond < domainSettings.DisableRawStage2 && domainData.RawAttack && !domainData.BypassAttack {
+			utils.AddLogs("Raw Attack Ended", "debug")
+			domainData.RawAttack = false
+		}
+
 	}
 
 	domains.DomainsData[domainName] = domainData
@@ -285,24 +340,20 @@ func commands() {
 					proxy.WatchedDomain = details[1]
 				}
 
-				screen.Clear()
-				screen.MoveTopLeft()
+				fmt.Print("\033[2J")
 				fmt.Println("[ " + utils.RedText("Loading") + " ] ...")
 				fmt.Println("\033[" + fmt.Sprint(12+proxy.MaxLogLength) + ";1H")
 				fmt.Print("[ " + utils.RedText("Command") + " ]: \033[s")
 			case "add":
-				screen.Clear()
-				screen.MoveTopLeft()
+				fmt.Print("\033[2J")
 				utils.AddDomain()
-				screen.Clear()
-				screen.MoveTopLeft()
+				fmt.Print("\033[2J")
 				fmt.Println("[ " + utils.RedText("Loading") + " ] ...")
 				fmt.Println("\033[" + fmt.Sprint(12+proxy.MaxLogLength) + ";1H")
 				fmt.Print("[ " + utils.RedText("Command") + " ]: \033[s")
 				reloadConfig()
 			case "rtlogs":
-				screen.Clear()
-				screen.MoveTopLeft()
+				fmt.Print("\033[2J")
 				if proxy.RealTimeLogs {
 					proxy.RealTimeLogs = false
 					fmt.Println("[ " + utils.RedText("Turning Real Time Logs Off") + " ] ...")
@@ -313,8 +364,7 @@ func commands() {
 				fmt.Println("\033[" + fmt.Sprint(12+proxy.MaxLogLength) + ";1H")
 				fmt.Print("[ " + utils.RedText("Command") + " ]: \033[s")
 			case "clrlogs":
-				screen.Clear()
-				screen.MoveTopLeft()
+				fmt.Print("\033[2J")
 				if proxy.WatchedDomain == "" {
 					for _, domain := range domains.Domains {
 						firewall.Mutex.Lock()
@@ -331,29 +381,25 @@ func commands() {
 				fmt.Println("\033[" + fmt.Sprint(12+proxy.MaxLogLength) + ";1H")
 				fmt.Print("[ " + utils.RedText("Command") + " ]: \033[s")
 			case "delcache":
-				screen.Clear()
-				screen.MoveTopLeft()
+				fmt.Print("\033[2J")
 				fmt.Println("[ " + utils.RedText("Clearing Cache For "+proxy.WatchedDomain) + " ] ...")
 				clearCache()
 				fmt.Println("\033[" + fmt.Sprint(12+proxy.MaxLogLength) + ";1H")
 				fmt.Print("[ " + utils.RedText("Command") + " ]: \033[s")
 			case "reload":
-				screen.Clear()
-				screen.MoveTopLeft()
+				fmt.Print("\033[2J")
 				fmt.Println("[ " + utils.RedText("Reloading Proxy") + " ] ...")
 				reloadConfig()
 				fmt.Println("\033[" + fmt.Sprint(12+proxy.MaxLogLength) + ";1H")
 				fmt.Print("[ " + utils.RedText("Command") + " ]: \033[s")
 			case "help":
 				helpMode = true
-				screen.Clear()
-				screen.MoveTopLeft()
+				fmt.Print("\033[2J")
 				fmt.Println("[ " + utils.RedText("Loading") + " ] ...")
 				fmt.Println("\033[" + fmt.Sprint(12+proxy.MaxLogLength) + ";1H")
 				fmt.Print("[ " + utils.RedText("Command") + " ]: \033[s")
 			case "cachemode":
-				screen.Clear()
-				screen.MoveTopLeft()
+				fmt.Print("\033[2J")
 				if proxy.CacheEnabled {
 					proxy.CacheEnabled = false
 					fmt.Println("[ " + utils.RedText("Turning Caching Off") + " ] ...")
@@ -364,8 +410,7 @@ func commands() {
 				fmt.Println("\033[" + fmt.Sprint(12+proxy.MaxLogLength) + ";1H")
 				fmt.Print("[ " + utils.RedText("Command") + " ]: \033[s")
 			default:
-				screen.Clear()
-				screen.MoveTopLeft()
+				fmt.Print("\033[2J")
 				fmt.Println("\033[" + fmt.Sprint(12+proxy.MaxLogLength) + ";1H")
 				fmt.Print("[ " + utils.RedText("Command") + " ]: \033[s")
 			}
@@ -462,6 +507,8 @@ func reloadConfig() {
 		})
 		dProxy.Transport = &RoundTripper{}
 
+		dProxyHandler := adaptor.HTTPHandler(dProxy)
+
 		var cert tls.Certificate = tls.Certificate{}
 		if !proxy.Cloudflare {
 			var certErr error
@@ -481,7 +528,7 @@ func reloadConfig() {
 			CacheRules:    cacheRules,
 			RawCacheRules: rawCacheRules,
 
-			DomainProxy:        dProxy,
+			DomainProxy:        dProxyHandler,
 			DomainCertificates: cert,
 			DomainWebhooks: domains.WebhookSettings{
 				URL:            domain.Webhook.URL,

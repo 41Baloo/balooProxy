@@ -1,3 +1,7 @@
+# **Attention**
+
+This is the `lite` version of balooProxy. Instead of `net/http` it uses `gofiber` as to increase performance at the cost of features. This version only supports http/1(.1) and some custom firewall fields might not be supported
+
 # **Features**
 
 ## **TLS-Fingerprinting**
