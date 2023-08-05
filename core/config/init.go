@@ -8,6 +8,7 @@ import (
 	"goProxy/core/db"
 	"goProxy/core/domains"
 	"goProxy/core/firewall"
+	"goProxy/core/pnc"
 	"goProxy/core/proxy"
 	"goProxy/core/server"
 	"goProxy/core/utils"
@@ -179,7 +180,8 @@ func Load() {
 		})
 
 		firewall.Mutex.Lock()
-		domains.DomainsData[domain.Name] = domains.DomainData{
+		pnc.LogError("INIT: " + domain.Name)
+		domains.DomainsData.Set(domain.Name, domains.DomainData{
 			Stage:            1,
 			StageManuallySet: false,
 			RawAttack:        false,
@@ -197,37 +199,30 @@ func Load() {
 			PeakRequestsPerSecond:         0,
 			PeakRequestsBypassedPerSecond: 0,
 			RequestLogger:                 []domains.RequestLog{},
-		}
+		})
+		/*
+			domains.DomainsData[domain.Name] = domains.DomainData{
+				Stage:            1,
+				StageManuallySet: false,
+				RawAttack:        false,
+				BypassAttack:     false,
+				LastLogs:         []string{},
+
+				TotalRequests:    0,
+				BypassedRequests: 0,
+
+				PrevRequests: 0,
+				PrevBypassed: 0,
+
+				RequestsPerSecond:             0,
+				RequestsBypassedPerSecond:     0,
+				PeakRequestsPerSecond:         0,
+				PeakRequestsBypassedPerSecond: 0,
+				RequestLogger:                 []domains.RequestLog{},
+			}
+		*/
 		firewall.Mutex.Unlock()
 	}
-
-	domains.DomainsMap.Store("debug", domains.DomainSettings{
-		Name: "debug",
-	})
-
-	firewall.Mutex.Lock()
-	domains.DomainsData["debug"] = domains.DomainData{
-		Stage:            0,
-		StageManuallySet: false,
-		RawAttack:        false,
-		BypassAttack:     false,
-		BufferCooldown:   0,
-		LastLogs:         []string{},
-
-		TotalRequests:    0,
-		BypassedRequests: 0,
-
-		PrevRequests: 0,
-		PrevBypassed: 0,
-
-		RequestsPerSecond:             0,
-		RequestsBypassedPerSecond:     0,
-		PeakRequestsPerSecond:         0,
-		PeakRequestsBypassedPerSecond: 0,
-		RequestLogger:                 []domains.RequestLog{},
-	}
-
-	firewall.Mutex.Unlock()
 
 	vcErr := VersionCheck()
 	if vcErr != nil {

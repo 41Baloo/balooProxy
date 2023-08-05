@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"goProxy/core/domains"
+	"goProxy/core/pnc"
 	"goProxy/core/proxy"
 	"os"
 	"strconv"
@@ -19,7 +20,10 @@ var (
 // Only run in locked thread
 func AddLogs(entry string, domainName string) domains.DomainData {
 
-	domainData := domains.DomainsData[domainName]
+	pnc.LogError("BP6: " + domainName)
+	domainData := domains.DomainsData.Get(domainName)
+	//domainData := domains.DomainsData[domainName]
+	pnc.LogError("AP6: " + domainName)
 
 	//Calculate how close we are to overflowing
 	logOverflow := len(domainData.LastLogs) - proxy.MaxLogLength
@@ -43,7 +47,10 @@ func AddLogs(entry string, domainName string) domains.DomainData {
 			PrintMutex.Unlock()
 		}
 
-		domains.DomainsData[domainName] = domainData
+		pnc.LogError("BAL: " + domainName)
+		domains.DomainsData.Set(domainName, domainData)
+		//domains.DomainsData[domainName] = domainData
+		pnc.LogError("AAL: " + domainName)
 
 		return domainData
 	}
@@ -59,16 +66,25 @@ func AddLogs(entry string, domainName string) domains.DomainData {
 		PrintMutex.Unlock()
 	}
 
-	domains.DomainsData[domainName] = domainData
+	pnc.LogError("BAL2: " + domainName)
+	domains.DomainsData.Set(domainName, domainData)
+	//domains.DomainsData[domainName] = domainData
+	pnc.LogError("AAL2: " + domainName)
 
 	return domainData
 }
 
 // Only run in locked thread
 func ClearLogs(domainName string) domains.DomainData {
-	domainData := domains.DomainsData[domainName]
+	pnc.LogError("BP7: " + domainName)
+	domainData := domains.DomainsData.Get(domainName)
+	//domainData := domains.DomainsData[domainName]
+	pnc.LogError("AP7: " + domainName)
 	domainData.LastLogs = nil
-	domains.DomainsData[domainName] = domainData
+	pnc.LogError("BMW8: " + domainName)
+	domains.DomainsData.Set(domainName, domainData)
+	//domains.DomainsData[domainName] = domainData
+	pnc.LogError("AMW8: " + domainName)
 	return domainData
 }
 

@@ -2,6 +2,8 @@ package domains
 
 import (
 	"crypto/tls"
+	"fmt"
+	"goProxy/core/pnc"
 	"net/http"
 	"sync"
 	"time"
@@ -13,10 +15,46 @@ import (
 var (
 	Domains      = []string{}
 	DomainsMap   sync.Map
-	DomainsData  = map[string]DomainData{}
+	DomainsDataN = map[string]DomainData{}
+	DomainsData  = &DomainsDataDebug{
+		m: DomainsDataN,
+	}
 	DomainsCache sync.Map
 	Config       *Configuration
 )
+
+type DomainsDataDebug struct {
+	m map[string]DomainData
+}
+
+func (sm DomainsDataDebug) GetMap() map[string]DomainData {
+	pnc.LogError("[!] Map Requested")
+	return sm.m
+}
+
+func (sm DomainsDataDebug) Set(key string, value DomainData) {
+
+	if _, exists := sm.m[key]; exists {
+		pnc.LogError("Overwriting key: " + key)
+	} else {
+		pnc.LogError("[!] Setting key: " + key)
+	}
+
+	sm.m[key] = value
+}
+
+func (sm DomainsDataDebug) Get(key string) DomainData {
+
+	pnc.LogError("Getting key: " + key)
+	val := sm.m[key]
+	return val
+}
+
+func (sm DomainsDataDebug) Delete(key string) {
+
+	fmt.Printf("Deleting key: %s\n", key)
+	delete(sm.m, key)
+}
 
 type Configuration struct {
 	Proxy   Proxy    `json:"proxy"`

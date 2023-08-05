@@ -77,8 +77,12 @@ func Monitor() {
 		fmt.Print("\033[1;1H")
 
 		firewall.Mutex.Lock()
-		for name, data := range domains.DomainsData {
-			checkAttack(name, data)
+		tempMap := domains.DomainsData.GetMap()
+		pnc.LogError("DBD: " + fmt.Sprint(tempMap))
+		for name, _ := range tempMap /*domains.DomainsData*/ {
+			pnc.LogError("BLOG: " + name)
+			checkAttack(name)
+			pnc.LogError("ALOG: " + name)
 		}
 		firewall.Mutex.Unlock()
 
@@ -90,11 +94,9 @@ func Monitor() {
 }
 
 // Only run this inside of a locked thread to avoid false reports
-func checkAttack(domainName string, domainData domains.DomainData) {
+func checkAttack(domainName string) {
 
-	if domainName == "debug" {
-		return
-	}
+	domainData := domains.DomainsData.Get(domainName)
 
 	domainData.RequestsPerSecond = domainData.TotalRequests - domainData.PrevRequests
 	domainData.RequestsBypassedPerSecond = domainData.BypassedRequests - domainData.PrevBypassed
@@ -121,13 +123,21 @@ func checkAttack(domainName string, domainData domains.DomainData) {
 		}
 
 		settingQuery, _ := domains.DomainsMap.Load(domainName)
+		if settingQuery == nil {
+			fmt.Println(domains.DomainsData)
+			for name, _ := range domains.DomainsData.GetMap() /*domains.DomainsData*/ {
+				fmt.Println(name)
+			}
+			fmt.Println(settingQuery)
+			panic(domainName)
+			return
+		}
 		domainSettings := settingQuery.(domains.DomainSettings)
 
 		if !domainData.BypassAttack && !domainData.RawAttack && (domainData.BufferCooldown > 0) {
 			domainData.BufferCooldown--
 
 			if domainData.BufferCooldown == 0 {
-				utils.AddLogs("Attack Ending Webhook Sent", "debug")
 				go utils.SendWebhook(domainData, domainSettings, int(1))
 				domainData.PeakRequestsPerSecond = 0
 				domainData.PeakRequestsBypassedPerSecond = 0
@@ -139,7 +149,6 @@ func checkAttack(domainName string, domainData domains.DomainData) {
 		case 1:
 			// A Bypassing Attack Started
 			if domainData.RequestsBypassedPerSecond > domainSettings.BypassStage1 && !domainData.BypassAttack {
-				utils.AddLogs("Bypassing Attack Started", "debug")
 				domainData.BypassAttack = true
 				domainData.Stage = 2
 				if domainData.BufferCooldown == 0 {
@@ -163,7 +172,6 @@ func checkAttack(domainName string, domainData domains.DomainData) {
 
 				// Stage 2 is no longer getting bypassed
 			} else if domainData.RequestsBypassedPerSecond < domainSettings.DisableBypassStage2 && domainData.RequestsPerSecond < domainSettings.DisableRawStage2 && domainData.BypassAttack {
-				utils.AddLogs("Bypassing Attack Ended", "debug")
 				domainData.BypassAttack = false
 				domainData.RawAttack = false
 				domainData.Stage = 1
@@ -177,7 +185,6 @@ func checkAttack(domainName string, domainData domains.DomainData) {
 
 		// An attack that didnt bypass was started
 		if domainData.RequestsPerSecond > domainSettings.DisableRawStage2 && !domainData.RawAttack && !domainData.BypassAttack {
-			utils.AddLogs("Raw Attack Started", "debug")
 			domainData.RawAttack = true
 
 			if domainData.BufferCooldown == 0 {
@@ -195,13 +202,15 @@ func checkAttack(domainName string, domainData domains.DomainData) {
 			//Set/Start cooldown
 			domainData.BufferCooldown = 10
 		} else if domainData.RequestsPerSecond < domainSettings.DisableRawStage2 && domainData.RawAttack && !domainData.BypassAttack {
-			utils.AddLogs("Raw Attack Ended", "debug")
 			domainData.RawAttack = false
 		}
 
 	}
 
-	domains.DomainsData[domainName] = domainData
+	pnc.LogError("BMW3: " + domainName)
+	domains.DomainsData.Set(domainName, domainData)
+	//domains.DomainsData[domainName] = domainData
+	pnc.LogError("BMW3: " + domainName)
 }
 
 func printStats() {
@@ -232,10 +241,13 @@ func printStats() {
 	fmt.Println("")
 
 	firewall.Mutex.Lock()
-	domainData := domains.DomainsData[proxy.WatchedDomain]
+	pnc.LogError("BP5: " + proxy.WatchedDomain)
+	domainData := domains.DomainsData.Get(proxy.WatchedDomain)
+	//domainData := domains.DomainsData[proxy.WatchedDomain]
+	pnc.LogError("AP5: " + proxy.WatchedDomain)
 	firewall.Mutex.Unlock()
 
-	if domainData.Stage == 0 && proxy.WatchedDomain != "debug" {
+	if domainData.Stage == 0 {
 		if proxy.WatchedDomain != "" {
 			fmt.Println("[" + utils.RedText("!") + "] [ " + utils.RedText("Domain \""+proxy.WatchedDomain+"\" Not Found") + " ]")
 			fmt.Println("")
@@ -300,7 +312,10 @@ func commands() {
 			details := strings.Split(input, " ")
 
 			firewall.Mutex.Lock()
-			domainData := domains.DomainsData[proxy.WatchedDomain]
+			pnc.LogError("BP4: " + proxy.WatchedDomain)
+			domainData := domains.DomainsData.Get(proxy.WatchedDomain)
+			//domainData := domains.DomainsData[proxy.WatchedDomain]
+			pnc.LogError("AP4: " + proxy.WatchedDomain)
 			firewall.Mutex.Unlock()
 			helpMode = false
 
@@ -323,14 +338,20 @@ func commands() {
 					domainData.StageManuallySet = false
 
 					firewall.Mutex.Lock()
-					domains.DomainsData[proxy.WatchedDomain] = domainData
+					pnc.LogError("BMW5: " + proxy.WatchedDomain)
+					domains.DomainsData.Set(proxy.WatchedDomain, domainData)
+					//domains.DomainsData[proxy.WatchedDomain] = domainData
+					pnc.LogError("AMW5: " + proxy.WatchedDomain)
 					firewall.Mutex.Unlock()
 				} else {
 					domainData.Stage = stage
 					domainData.StageManuallySet = true
 
 					firewall.Mutex.Lock()
-					domains.DomainsData[proxy.WatchedDomain] = domainData
+					pnc.LogError("BMW6: " + proxy.WatchedDomain)
+					domains.DomainsData.Set(proxy.WatchedDomain, domainData)
+					//domains.DomainsData[proxy.WatchedDomain] = domainData
+					pnc.LogError("AMW6: " + proxy.WatchedDomain)
 					firewall.Mutex.Unlock()
 				}
 			case "domain":
@@ -547,7 +568,8 @@ func reloadConfig() {
 		})
 
 		firewall.Mutex.Lock()
-		domains.DomainsData[domain.Name] = domains.DomainData{
+		pnc.LogError("BMW7: " + domain.Name)
+		domains.DomainsData.Set(domain.Name, domains.DomainData{
 			Stage:            1,
 			StageManuallySet: false,
 			RawAttack:        false,
@@ -565,7 +587,29 @@ func reloadConfig() {
 			PeakRequestsPerSecond:         0,
 			PeakRequestsBypassedPerSecond: 0,
 			RequestLogger:                 []domains.RequestLog{},
-		}
+		})
+		/*
+			domains.DomainsData[domain.Name] = domains.DomainData{
+				Stage:            1,
+				StageManuallySet: false,
+				RawAttack:        false,
+				BypassAttack:     false,
+				LastLogs:         []string{},
+
+				TotalRequests:    0,
+				BypassedRequests: 0,
+
+				PrevRequests: 0,
+				PrevBypassed: 0,
+
+				RequestsPerSecond:             0,
+				RequestsBypassedPerSecond:     0,
+				PeakRequestsPerSecond:         0,
+				PeakRequestsBypassedPerSecond: 0,
+				RequestLogger:                 []domains.RequestLog{},
+			}
+		*/
+		pnc.LogError("AMW7: " + domain.Name)
 		firewall.Mutex.Unlock()
 	}
 
@@ -597,14 +641,10 @@ func clearProxyCache() {
 			proxyCpuUsage = 0
 		}
 
-		utils.AddLogs("Calculated CPU To Be "+fmt.Sprint(proxyCpuUsage), "debug")
-
 		proxyMemUsage, pmuErr := strconv.ParseFloat(proxy.RamUsage, 32)
 		if pmuErr != nil {
 			proxyMemUsage = 0
 		}
-
-		utils.AddLogs("Calculated Memory To Be "+fmt.Sprint(proxyMemUsage), "debug")
 
 		// Only clear if proxy isnt under attack / memory is running out
 		if (proxyCpuUsage < 15 && proxyMemUsage > 25) || proxyMemUsage > 95 {
@@ -612,9 +652,6 @@ func clearProxyCache() {
 				firewall.CacheIps.Delete(key)
 				return true
 			})
-			utils.AddLogs("Cleared Cached IPs", "debug")
-		} else {
-			utils.AddLogs("Did Not Clear Cached IPs", "debug")
 		}
 		// Same for here
 		imgCachelen := 0
@@ -627,9 +664,6 @@ func clearProxyCache() {
 				firewall.CacheImgs.Delete(key)
 				return true
 			})
-			utils.AddLogs("Cleared Cached Captchas", "debug")
-		} else {
-			utils.AddLogs("Did Not Clear Cached Captchas", "debug")
 		}
 		firewall.Mutex.Unlock()
 		time.Sleep(2 * time.Minute)
@@ -661,10 +695,6 @@ func clearOutdatedCache() {
 		})
 		reloadConfig()
 
-		firewall.Mutex.Lock()
-		utils.AddLogs("Cleared Outdated Cache", "debug")
-		firewall.Mutex.Unlock()
-
 		time.Sleep(5 * time.Hour)
 	}
 }
@@ -686,10 +716,6 @@ func generateOTPSecrets() {
 		proxy.CookieOTP = utils.EncryptSha(proxy.CookieSecret, currDate)
 		proxy.JSOTP = utils.EncryptSha(proxy.JSSecret, currDate)
 		proxy.CaptchaOTP = utils.EncryptSha(proxy.CaptchaSecret, currDate)
-
-		firewall.Mutex.Lock()
-		utils.AddLogs("Generated OTP Secrets", "debug")
-		firewall.Mutex.Unlock()
 
 		time.Sleep(1 * time.Hour)
 	}

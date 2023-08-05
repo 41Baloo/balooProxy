@@ -3,6 +3,7 @@ package server
 import (
 	"bytes"
 	"encoding/base64"
+	"fmt"
 	"goProxy/core/api"
 	"goProxy/core/domains"
 	"goProxy/core/firewall"
@@ -26,15 +27,24 @@ func Middleware(c *fiber.Ctx) {
 
 	defer pnc.PanicHndl()
 
-	domainName := c.Hostname()
+	reqHeaders := c.GetReqHeaders()
+	domainName := strings.Split(reqHeaders["Host"], ":")[0]
+
 	firewall.Mutex.Lock()
-	domainData := domains.DomainsData[domainName]
+	pnc.LogError("DBDB: " + fmt.Sprint(domains.DomainsData))
+	pnc.LogError("BP1: " + domainName)
+	domainData := domains.DomainsData.Get(domainName)
+	//domainData := domains.DomainsData[domainName]
+	pnc.LogError("AP1: " + domainName)
+	pnc.LogError("DBD2: " + fmt.Sprint(domains.DomainsData))
 	firewall.Mutex.Unlock()
 
 	if domainData.Stage == 0 {
 		c.SendString("balooProxy: " + domainName + " does not exist. If you are the owner please check your config.json if you believe this is a mistake")
 		return
 	}
+
+	domainName = "baloo.dog"
 
 	var ip string
 	var tlsFp string
@@ -45,7 +55,6 @@ func Middleware(c *fiber.Ctx) {
 	var ipCount int
 	var ipCountCookie int
 
-	reqHeaders := c.GetReqHeaders()
 	cContext := c.Context()
 
 	if domains.Config.Proxy.Cloudflare {
@@ -78,9 +87,15 @@ func Middleware(c *fiber.Ctx) {
 	}
 
 	firewall.Mutex.Lock()
-	domainData = domains.DomainsData[domainName]
+	pnc.LogError("BP2: " + domainName)
+	domainData = domains.DomainsData.Get(domainName)
+	//domainData = domains.DomainsData[domainName]
+	pnc.LogError("AP2: " + domainName)
 	domainData.TotalRequests++
-	domains.DomainsData[domainName] = domainData
+	pnc.LogError("BMW2: " + domainName)
+	domains.DomainsData.Set(domainName, domainData)
+	//domains.DomainsData[domainName] = domainData
+	pnc.LogError("AMW2: " + domainName)
 	firewall.Mutex.Unlock()
 
 	c.Append("baloo-proxy-lite", "1.4")
@@ -492,9 +507,15 @@ padding: 20px;
 	c.Locals("domain", domainSettings)
 
 	firewall.Mutex.Lock()
-	domainData = domains.DomainsData[domainName]
+	pnc.LogError("BP3: " + domainName)
+	domainData = domains.DomainsData.Get(domainName)
+	//domainData = domains.DomainsData[domainName]
+	pnc.LogError("AP3: " + domainName)
 	domainData.BypassedRequests++
-	domains.DomainsData[domainName] = domainData
+	pnc.LogError("BMW1: " + domainName)
+	domains.DomainsData.Set(domainName, domainData)
+	//domains.DomainsData[domainName] = domainData
+	pnc.LogError("AMW1: " + domainName)
 	firewall.Mutex.Unlock()
 
 	//Reserved proxy-paths
