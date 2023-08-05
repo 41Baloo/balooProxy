@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/gofiber/fiber/v2/middleware/adaptor"
+	"github.com/inancgumus/screen"
 	"github.com/kor44/gofilter"
 	"github.com/shirou/gopsutil/cpu"
 	"golang.org/x/term"
@@ -36,7 +37,8 @@ func Monitor() {
 	defer pnc.PanicHndl()
 
 	PrintMutex.Lock()
-	fmt.Print("\033[2J")
+	screen.Clear()
+	screen.MoveTopLeft()
 	PrintMutex.Unlock()
 
 	//Responsible for handeling user-commands
@@ -69,7 +71,8 @@ func Monitor() {
 				proxy.MaxLogLength = pHeight
 			}
 
-			fmt.Print("\033[2J")
+			screen.Clear()
+			screen.MoveTopLeft()
 			fmt.Println("\033[" + fmt.Sprint(12+proxy.MaxLogLength) + ";1H")
 			fmt.Print("[ " + utils.RedText("Command") + " ]: \033[s")
 		}
@@ -340,20 +343,24 @@ func commands() {
 					proxy.WatchedDomain = details[1]
 				}
 
-				fmt.Print("\033[2J")
+				screen.Clear()
+				screen.MoveTopLeft()
 				fmt.Println("[ " + utils.RedText("Loading") + " ] ...")
 				fmt.Println("\033[" + fmt.Sprint(12+proxy.MaxLogLength) + ";1H")
 				fmt.Print("[ " + utils.RedText("Command") + " ]: \033[s")
 			case "add":
-				fmt.Print("\033[2J")
+				screen.Clear()
+				screen.MoveTopLeft()
 				utils.AddDomain()
-				fmt.Print("\033[2J")
+				screen.Clear()
+				screen.MoveTopLeft()
 				fmt.Println("[ " + utils.RedText("Loading") + " ] ...")
 				fmt.Println("\033[" + fmt.Sprint(12+proxy.MaxLogLength) + ";1H")
 				fmt.Print("[ " + utils.RedText("Command") + " ]: \033[s")
 				reloadConfig()
 			case "rtlogs":
-				fmt.Print("\033[2J")
+				screen.Clear()
+				screen.MoveTopLeft()
 				if proxy.RealTimeLogs {
 					proxy.RealTimeLogs = false
 					fmt.Println("[ " + utils.RedText("Turning Real Time Logs Off") + " ] ...")
@@ -364,7 +371,8 @@ func commands() {
 				fmt.Println("\033[" + fmt.Sprint(12+proxy.MaxLogLength) + ";1H")
 				fmt.Print("[ " + utils.RedText("Command") + " ]: \033[s")
 			case "clrlogs":
-				fmt.Print("\033[2J")
+				screen.Clear()
+				screen.MoveTopLeft()
 				if proxy.WatchedDomain == "" {
 					for _, domain := range domains.Domains {
 						firewall.Mutex.Lock()
@@ -381,25 +389,29 @@ func commands() {
 				fmt.Println("\033[" + fmt.Sprint(12+proxy.MaxLogLength) + ";1H")
 				fmt.Print("[ " + utils.RedText("Command") + " ]: \033[s")
 			case "delcache":
-				fmt.Print("\033[2J")
+				screen.Clear()
+				screen.MoveTopLeft()
 				fmt.Println("[ " + utils.RedText("Clearing Cache For "+proxy.WatchedDomain) + " ] ...")
 				clearCache()
 				fmt.Println("\033[" + fmt.Sprint(12+proxy.MaxLogLength) + ";1H")
 				fmt.Print("[ " + utils.RedText("Command") + " ]: \033[s")
 			case "reload":
-				fmt.Print("\033[2J")
+				screen.Clear()
+				screen.MoveTopLeft()
 				fmt.Println("[ " + utils.RedText("Reloading Proxy") + " ] ...")
 				reloadConfig()
 				fmt.Println("\033[" + fmt.Sprint(12+proxy.MaxLogLength) + ";1H")
 				fmt.Print("[ " + utils.RedText("Command") + " ]: \033[s")
 			case "help":
 				helpMode = true
-				fmt.Print("\033[2J")
+				screen.Clear()
+				screen.MoveTopLeft()
 				fmt.Println("[ " + utils.RedText("Loading") + " ] ...")
 				fmt.Println("\033[" + fmt.Sprint(12+proxy.MaxLogLength) + ";1H")
 				fmt.Print("[ " + utils.RedText("Command") + " ]: \033[s")
 			case "cachemode":
-				fmt.Print("\033[2J")
+				screen.Clear()
+				screen.MoveTopLeft()
 				if proxy.CacheEnabled {
 					proxy.CacheEnabled = false
 					fmt.Println("[ " + utils.RedText("Turning Caching Off") + " ] ...")
@@ -410,7 +422,8 @@ func commands() {
 				fmt.Println("\033[" + fmt.Sprint(12+proxy.MaxLogLength) + ";1H")
 				fmt.Print("[ " + utils.RedText("Command") + " ]: \033[s")
 			default:
-				fmt.Print("\033[2J")
+				screen.Clear()
+				screen.MoveTopLeft()
 				fmt.Println("\033[" + fmt.Sprint(12+proxy.MaxLogLength) + ";1H")
 				fmt.Print("[ " + utils.RedText("Command") + " ]: \033[s")
 			}
@@ -548,6 +561,7 @@ func reloadConfig() {
 
 		firewall.Mutex.Lock()
 		domains.DomainsData[domain.Name] = domains.DomainData{
+			Name:             domain.Name,
 			Stage:            1,
 			StageManuallySet: false,
 			RawAttack:        false,

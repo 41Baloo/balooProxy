@@ -26,7 +26,8 @@ func Middleware(c *fiber.Ctx) {
 
 	defer pnc.PanicHndl()
 
-	domainName := c.Hostname()
+	reqHeaders := c.GetReqHeaders()
+	domainName := reqHeaders["Host"]
 	firewall.Mutex.Lock()
 	domainData := domains.DomainsData[domainName]
 	firewall.Mutex.Unlock()
@@ -35,6 +36,8 @@ func Middleware(c *fiber.Ctx) {
 		c.SendString("balooProxy: " + domainName + " does not exist. If you are the owner please check your config.json if you believe this is a mistake")
 		return
 	}
+
+	domainName = domainData.Name
 
 	var ip string
 	var tlsFp string
@@ -45,7 +48,6 @@ func Middleware(c *fiber.Ctx) {
 	var ipCount int
 	var ipCountCookie int
 
-	reqHeaders := c.GetReqHeaders()
 	cContext := c.Context()
 
 	if domains.Config.Proxy.Cloudflare {

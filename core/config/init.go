@@ -180,6 +180,7 @@ func Load() {
 
 		firewall.Mutex.Lock()
 		domains.DomainsData[domain.Name] = domains.DomainData{
+			Name:             domain.Name,
 			Stage:            1,
 			StageManuallySet: false,
 			RawAttack:        false,
@@ -207,6 +208,7 @@ func Load() {
 
 	firewall.Mutex.Lock()
 	domains.DomainsData["debug"] = domains.DomainData{
+		Name:             "debug",
 		Stage:            0,
 		StageManuallySet: false,
 		RawAttack:        false,

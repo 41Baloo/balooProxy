@@ -63,6 +63,7 @@ type DomainSettings struct {
 }
 
 type DomainData struct {
+	Name             string
 	Stage            int
 	StageManuallySet bool
 	RawAttack        bool
