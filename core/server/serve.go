@@ -48,12 +48,13 @@ func Serve() {
 	defer pnc.PanicHndl()
 
 	fbConfig := fiber.Config{
-		DisableStartupMessage: true,
-		JSONEncoder:           json.Marshal,
-		JSONDecoder:           json.Unmarshal,
-		IdleTimeout:           proxy.IdleTimeoutDuration,
-		ReadTimeout:           proxy.ReadTimeoutDuration,
-		WriteTimeout:          proxy.WriteTimeoutDuration,
+		DisableStartupMessage:     true,
+		DisableDefaultContentType: true,
+		JSONEncoder:               json.Marshal,
+		JSONDecoder:               json.Unmarshal,
+		IdleTimeout:               proxy.IdleTimeoutDuration,
+		ReadTimeout:               proxy.ReadTimeoutDuration,
+		WriteTimeout:              proxy.WriteTimeoutDuration,
 	}
 
 	if domains.Config.Proxy.Cloudflare {
