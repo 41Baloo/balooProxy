@@ -443,7 +443,7 @@ func (rt *RoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
 			case proxy.CACHE_CLIENTIP:
 				cacheKey = req.Host + reqIP
 			default:
-				panic("[ " + utils.RedText("Error") + " ]: " + utils.RedText("Cache Error: Failed to get correct cache resp"))
+				panic("[ " + utils.PrimaryColor("Error") + " ]: " + utils.PrimaryColor("Cache Error: Failed to get correct cache resp"))
 			}
 
 			domains.DomainsCache.Store(cacheKey, domains.CacheResponse{

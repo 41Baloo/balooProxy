@@ -118,3 +118,53 @@ goProxy/core/server.Monitor()
 created by main.main
 	/workspaces/balooProxy/main.go:35 +0x185
 
+[ 08:59:28 ]: Caught Panic: 0
+
+goroutine 1 [running]:
+goProxy/core/pnc.PanicHndl()
+	/workspaces/balooProxy/core/pnc/panicHandler.go:26 +0x7a
+panic({0x8723c0, 0xc322a0})
+	/usr/local/go/src/runtime/panic.go:884 +0x213
+goProxy/core/config.Load()
+	/workspaces/balooProxy/core/config/init.go:92 +0x59f
+main.main()
+	/workspaces/balooProxy/main.go:30 +0x12a
+
+[ 08:04:30 ]: Caught Panic: 1;31
+
+goroutine 1 [running]:
+goProxy/core/pnc.PanicHndl()
+	/workspaces/balooProxy/core/pnc/panicHandler.go:26 +0x7a
+panic({0x872c80, 0xc000093870})
+	/usr/local/go/src/runtime/panic.go:884 +0x213
+goProxy/core/utils.SetColor(...)
+	/workspaces/balooProxy/core/utils/text.go:91
+goProxy/core/config.Load()
+	/workspaces/balooProxy/core/config/init.go:90 +0x514
+main.main()
+	/workspaces/balooProxy/main.go:30 +0x12a
+
+[ 09:49:45 ]: Caught Panic: [ [0;31m![0m ] [ Admin Secret Contains 'CHANGE_ME', Refusing To Load ]
+
+goroutine 1 [running]:
+goProxy/core/pnc.PanicHndl()
+	/workspaces/balooProxy/core/pnc/panicHandler.go:26 +0x7a
+panic({0x876e00, 0xc000111850})
+	/usr/local/go/src/runtime/panic.go:884 +0x213
+goProxy/core/config.Load()
+	/workspaces/balooProxy/core/config/init.go:58 +0x1965
+main.main()
+	/workspaces/balooProxy/main.go:30 +0x12a
+
+[ 09:07:46 ]: Caught Panic: failed to listen: listen tcp4 :80: bind: permission denied
+
+goroutine 36 [running]:
+goProxy/core/pnc.PanicHndl()
+	/workspaces/balooProxy/core/pnc/panicHandler.go:26 +0x7a
+panic({0x8900a0, 0xc0002f0020})
+	/usr/local/go/src/runtime/panic.go:884 +0x213
+goProxy/core/server.Serve()
+	/workspaces/balooProxy/core/server/serve.go:73 +0x4b0
+created by main.main
+	/workspaces/balooProxy/main.go:34 +0x174
+

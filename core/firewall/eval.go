@@ -21,7 +21,7 @@ func EvalFirewallRule(currDomain domains.DomainSettings, variables gofilter.Mess
 					//Dont change anything on error. We dont want issues in production
 				} else {
 					result = result + actionInt
-					//fmt.Println("[" + redText("+") + "] [ Matched Rule ] > " + fmt.Sprint(result))
+					//fmt.Println("[" + PrimaryColor("+") + "] [ Matched Rule ] > " + fmt.Sprint(result))
 				}
 			case "-":
 				var actionInt int
@@ -31,7 +31,7 @@ func EvalFirewallRule(currDomain domains.DomainSettings, variables gofilter.Mess
 					//Dont change anything on error. We dont want issues in production
 				} else {
 					result = result - actionInt
-					//fmt.Println("[" + redText("+") + "] [ Matched Rule ] > " + fmt.Sprint(result))
+					//fmt.Println("[" + PrimaryColor("+") + "] [ Matched Rule ] > " + fmt.Sprint(result))
 				}
 			default:
 				var actionInt int

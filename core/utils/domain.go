@@ -9,8 +9,8 @@ import (
 )
 
 func AddDomain() {
-	fmt.Println("[ " + RedText("No Domain Configurations Found") + " ]")
-	fmt.Println("[ " + RedText("Configure New Domains In The Config.json") + " ]")
+	fmt.Println("[ " + PrimaryColor("No Domain Configurations Found") + " ]")
+	fmt.Println("[ " + PrimaryColor("Configure New Domains In The Config.json") + " ]")
 	fmt.Println("")
 	gDomain := domains.Domain{
 		Name:        AskString("What Is The Name Of Your Domain (eg. \"example.com\")", "example.com"),

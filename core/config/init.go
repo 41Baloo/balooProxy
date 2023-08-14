@@ -40,27 +40,27 @@ func Load() {
 
 	proxy.CookieSecret = domains.Config.Proxy.Secrets["cookie"]
 	if strings.Contains(proxy.CookieSecret, "CHANGE_ME") {
-		panic("[ " + utils.RedText("!") + " ] [ Cookie Secret Contains 'CHANGE_ME', Refusing To Load ]")
+		panic("[ " + utils.PrimaryColor("!") + " ] [ Cookie Secret Contains 'CHANGE_ME', Refusing To Load ]")
 	}
 
 	proxy.JSSecret = domains.Config.Proxy.Secrets["javascript"]
 	if strings.Contains(proxy.JSSecret, "CHANGE_ME") {
-		panic("[ " + utils.RedText("!") + " ] [ JS Secret Contains 'CHANGE_ME', Refusing To Load ]")
+		panic("[ " + utils.PrimaryColor("!") + " ] [ JS Secret Contains 'CHANGE_ME', Refusing To Load ]")
 	}
 
 	proxy.CaptchaSecret = domains.Config.Proxy.Secrets["captcha"]
 	if strings.Contains(proxy.CaptchaSecret, "CHANGE_ME") {
-		panic("[ " + utils.RedText("!") + " ] [ Captcha Secret Contains 'CHANGE_ME', Refusing To Load ]")
+		panic("[ " + utils.PrimaryColor("!") + " ] [ Captcha Secret Contains 'CHANGE_ME', Refusing To Load ]")
 	}
 
 	proxy.AdminSecret = domains.Config.Proxy.AdminSecret
 	if strings.Contains(proxy.AdminSecret, "CHANGE_ME") {
-		panic("[ " + utils.RedText("!") + " ] [ Admin Secret Contains 'CHANGE_ME', Refusing To Load ]")
+		panic("[ " + utils.PrimaryColor("!") + " ] [ Admin Secret Contains 'CHANGE_ME', Refusing To Load ]")
 	}
 
 	proxy.APISecret = domains.Config.Proxy.APISecret
 	if strings.Contains(proxy.APISecret, "CHANGE_ME") {
-		panic("[ " + utils.RedText("!") + " ] [ API Secret Contains 'CHANGE_ME'. Refusing To Load ]")
+		panic("[ " + utils.PrimaryColor("!") + " ] [ API Secret Contains 'CHANGE_ME'. Refusing To Load ]")
 	}
 
 	// Check if the Proxy Timeout Config has been set otherwise use default values
@@ -85,6 +85,11 @@ func Load() {
 		proxy.WriteTimeoutDuration = time.Duration(proxy.WriteTimeout).Abs() * time.Second
 	}
 
+	// Didn't think anyone would actually read through this mess
+	if len(domains.Config.Proxy.Colors) != 0 {
+		utils.SetColor(domains.Config.Proxy.Colors)
+	}
+
 	proxy.IPRatelimit = domains.Config.Proxy.Ratelimits["requests"]
 	proxy.FPRatelimit = domains.Config.Proxy.Ratelimits["unknownFingerprint"]
 	proxy.FailChallengeRatelimit = domains.Config.Proxy.Ratelimits["challengeFailures"]
@@ -107,7 +112,7 @@ func Load() {
 			}
 			rule, err := gofilter.NewFilter(fwRule.Expression)
 			if err != nil {
-				panic("[ " + utils.RedText("!") + " ] [ Error Loading Custom Firewall Rules: " + utils.RedText(err.Error()) + " ]")
+				panic("[ " + utils.PrimaryColor("!") + " ] [ Error Loading Custom Firewall Rules: " + utils.PrimaryColor(err.Error()) + " ]")
 			}
 
 			firewallRules = append(firewallRules, domains.Rule{
@@ -124,7 +129,7 @@ func Load() {
 
 			rule, err := gofilter.NewFilter(caRule.Expression)
 			if err != nil {
-				panic("[ " + utils.RedText("!") + " ] [ Error Loading Custom Cache Rules: " + utils.RedText(err.Error()) + " ]")
+				panic("[ " + utils.PrimaryColor("!") + " ] [ Error Loading Custom Cache Rules: " + utils.PrimaryColor(err.Error()) + " ]")
 			}
 
 			cacheRules = append(cacheRules, domains.Rule{
@@ -146,7 +151,7 @@ func Load() {
 			var certErr error
 			cert, certErr = tls.LoadX509KeyPair(domain.Certificate, domain.Key)
 			if certErr != nil {
-				panic("[ " + utils.RedText("!") + " ] [ " + utils.RedText("Error Loading Certificates: "+certErr.Error()) + " ]")
+				panic("[ " + utils.PrimaryColor("!") + " ] [ " + utils.PrimaryColor("Error Loading Certificates: "+certErr.Error()) + " ]")
 			}
 		}
 
@@ -233,7 +238,7 @@ func Load() {
 
 	vcErr := VersionCheck()
 	if vcErr != nil {
-		panic("[ " + utils.RedText("!") + " ] [ " + vcErr.Error() + " ]")
+		panic("[ " + utils.PrimaryColor("!") + " ] [ " + vcErr.Error() + " ]")
 	}
 
 	if len(domains.Domains) == 0 {
@@ -265,8 +270,8 @@ func VersionCheck() error {
 
 	if proxyVersions.StableVersion > proxy.ProxyVersion {
 
-		fmt.Println("[ " + utils.RedText("!") + " ] [ New Proxy Version " + fmt.Sprint(proxyVersions.StableVersion) + " Found. You Are using " + fmt.Sprint(proxy.ProxyVersion) + ". Consider Downloading The New Version From Github Or " + proxyVersions.Download + " ]")
-		fmt.Println("[ " + utils.RedText("+") + " ] [ Automatically Starting Proxy In 10 Seconds ]")
+		fmt.Println("[ " + utils.PrimaryColor("!") + " ] [ New Proxy Version " + fmt.Sprint(proxyVersions.StableVersion) + " Found. You Are using " + fmt.Sprint(proxy.ProxyVersion) + ". Consider Downloading The New Version From Github Or " + proxyVersions.Download + " ]")
+		fmt.Println("[ " + utils.PrimaryColor("+") + " ] [ Automatically Starting Proxy In 10 Seconds ]")
 
 		time.Sleep(10 * time.Second)
 

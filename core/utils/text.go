@@ -13,7 +13,8 @@ import (
 )
 
 var (
-	PrintMutex = &sync.Mutex{}
+	PrintMutex   = &sync.Mutex{}
+	ColorsString = "0;31"
 )
 
 // Only run in locked thread
@@ -34,9 +35,9 @@ func AddLogs(entry string, domainName string) domains.DomainData {
 			for i, log := range domainData.LastLogs {
 				// Check if out log is too big to display fully
 				if len(log)+4 > proxy.TWidth {
-					fmt.Print("\033[" + fmt.Sprint(11+i) + ";1H\033[K[" + RedText("!") + "] " + log[:len(log)-(len(log)+4-proxy.TWidth)] + " ...\033[0m\n")
+					fmt.Print("\033[" + fmt.Sprint(11+i) + ";1H\033[K[" + PrimaryColor("!") + "] " + log[:len(log)-(len(log)+4-proxy.TWidth)] + " ...\033[0m\n")
 				} else {
-					fmt.Print("\033[" + fmt.Sprint(11+i) + ";1H\033[K[" + RedText("!") + "] " + log + "\n")
+					fmt.Print("\033[" + fmt.Sprint(11+i) + ";1H\033[K[" + PrimaryColor("!") + "] " + log + "\n")
 				}
 			}
 			MoveInputLine()
@@ -51,9 +52,9 @@ func AddLogs(entry string, domainName string) domains.DomainData {
 	if domainName == proxy.WatchedDomain && proxy.RealTimeLogs {
 		PrintMutex.Lock()
 		if len(entry)+4 > proxy.TWidth {
-			fmt.Print("\033[" + fmt.Sprint((10 + len(domainData.LastLogs))) + ";1H\033[K[" + RedText("-") + "] " + entry[:len(entry)-(len(entry)+4-proxy.TWidth)] + " ...\033[0m\n")
+			fmt.Print("\033[" + fmt.Sprint((10 + len(domainData.LastLogs))) + ";1H\033[K[" + PrimaryColor("-") + "] " + entry[:len(entry)-(len(entry)+4-proxy.TWidth)] + " ...\033[0m\n")
 		} else {
-			fmt.Print("\033[" + fmt.Sprint((10 + len(domainData.LastLogs))) + ";1H\033[K[" + RedText("-") + "] " + entry + "\n")
+			fmt.Print("\033[" + fmt.Sprint((10 + len(domainData.LastLogs))) + ";1H\033[K[" + PrimaryColor("-") + "] " + entry + "\n")
 		}
 		MoveInputLine()
 		PrintMutex.Unlock()
@@ -74,11 +75,19 @@ func ClearLogs(domainName string) domains.DomainData {
 
 func MoveInputLine() {
 	fmt.Println("\033[" + fmt.Sprint(12+proxy.MaxLogLength) + ";1H")
-	fmt.Print("[ " + RedText("Command") + " ]: \033[u\033[s")
+	fmt.Print("[ " + PrimaryColor("Command") + " ]: \033[u\033[s")
 }
 
-func RedText(input string) string {
-	return "\033[31m" + input + "\033[0m"
+func PrimaryColor(input string) string {
+	return "\033[" + ColorsString + "m" + input + "\033[0m"
+}
+
+func SetColor(colorMap []string) {
+	res := ""
+	for _, color := range colorMap {
+		res += color + ";"
+	}
+	ColorsString = res[:len(res)-1]
 }
 
 func ClearScreen(length int) {
@@ -114,35 +123,35 @@ func EvalYN(input string, defVal bool) (result bool) {
 }
 
 func AskBool(question string, defaultVal bool) bool {
-	fmt.Print("[" + RedText("+") + "] [ " + RedText(question) + " ]: ")
+	fmt.Print("[" + PrimaryColor("+") + "] [ " + PrimaryColor(question) + " ]: ")
 	input := ReadTerminal()
 	if input == "" {
-		fmt.Println("[" + RedText("-") + "] [ " + RedText("Using Default Value "+fmt.Sprint(defaultVal)) + " ]")
+		fmt.Println("[" + PrimaryColor("-") + "] [ " + PrimaryColor("Using Default Value "+fmt.Sprint(defaultVal)) + " ]")
 		return defaultVal
 	}
 	return EvalYN(input, defaultVal)
 }
 
 func AskInt(question string, defaultVal int) int {
-	fmt.Print("[" + RedText("+") + "] [ " + RedText(question) + " ]: ")
+	fmt.Print("[" + PrimaryColor("+") + "] [ " + PrimaryColor(question) + " ]: ")
 	input := ReadTerminal()
 	if input == "" {
-		fmt.Println("[" + RedText("-") + "] [ " + RedText("Using Default Value "+fmt.Sprint(defaultVal)) + " ]")
+		fmt.Println("[" + PrimaryColor("-") + "] [ " + PrimaryColor("Using Default Value "+fmt.Sprint(defaultVal)) + " ]")
 		return defaultVal
 	}
 	result, err := strconv.Atoi(input)
 	if err != nil {
-		fmt.Println("[" + RedText("!") + "] [ " + RedText("The Provided Answer Is Not A Number!") + " ]")
+		fmt.Println("[" + PrimaryColor("!") + "] [ " + PrimaryColor("The Provided Answer Is Not A Number!") + " ]")
 		return AskInt(question, defaultVal)
 	}
 	return result
 }
 
 func AskString(question string, defaultVal string) string {
-	fmt.Print("[" + RedText("+") + "] [ " + RedText(question) + " ]: ")
+	fmt.Print("[" + PrimaryColor("+") + "] [ " + PrimaryColor(question) + " ]: ")
 	input := ReadTerminal()
 	if input == "" {
-		fmt.Println("[" + RedText("-") + "] [ " + RedText("Using Default Value "+defaultVal) + " ]")
+		fmt.Println("[" + PrimaryColor("-") + "] [ " + PrimaryColor("Using Default Value "+defaultVal) + " ]")
 		return defaultVal
 	}
 	return input
@@ -155,4 +164,8 @@ func JsonEscape(i string) string {
 	}
 	// Trim the beginning and trailing " character
 	return string(b[1 : len(b)-1])
+}
+
+func ChooseText() {
+
 }

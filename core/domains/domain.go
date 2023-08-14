@@ -92,6 +92,7 @@ type Proxy struct {
 	Secrets     map[string]string `json:"secrets"`
 	Timeout     TimeoutSettings   `json:"timeout"`
 	Ratelimits  map[string]int    `json:"ratelimits"`
+	Colors      []string          `json:"colors"`
 }
 
 type TimeoutSettings struct {

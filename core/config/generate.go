@@ -13,8 +13,8 @@ import (
 
 func Generate() {
 
-	fmt.Println("[ " + utils.RedText("No Configuration File Found") + " ]")
-	fmt.Println("[ " + utils.RedText("Configuring Proxy Now") + " ]")
+	fmt.Println("[ " + utils.PrimaryColor("No Configuration File Found") + " ]")
+	fmt.Println("[ " + utils.PrimaryColor("Configuring Proxy Now") + " ]")
 	fmt.Println("")
 
 	gConfig := domains.Configuration{
@@ -60,8 +60,8 @@ func Generate() {
 }
 
 func AddDomain() {
-	fmt.Println("[ " + utils.RedText("No Domain Configurations Found") + " ]")
-	fmt.Println("[ " + utils.RedText("Configure New Domains In The Config.json") + " ]")
+	fmt.Println("[ " + utils.PrimaryColor("No Domain Configurations Found") + " ]")
+	fmt.Println("[ " + utils.PrimaryColor("Configure New Domains In The Config.json") + " ]")
 	fmt.Println("")
 	gDomain := domains.Domain{
 		Name:        utils.AskString("What Is The Name Of Your Domain (eg. \"example.com\")", "example.com"),

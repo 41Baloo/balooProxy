@@ -7,7 +7,7 @@
         "secrets": {
             "captcha": "CHANG_ME1",
             "cookie": "CHANG_ME2",
-            "javascript": "HANGE_ME3"
+            "javascript": "CHANGE_ME3"
         },
         "timeout": {
             "idle": 5,
@@ -20,7 +20,11 @@
             "noRequestsSent": 10,
             "requests": 500,
             "unknownFingerprint": 150
-        }
+        },
+        "colors": [
+            "0",
+            "31"
+        ]
     },
     "domains": [
         {

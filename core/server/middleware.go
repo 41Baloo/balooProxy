@@ -206,6 +206,7 @@ func Middleware(c *fiber.Ctx) {
 			return
 		case 2:
 			c.Append("Content-Type", "text/html")
+			c.Append("Cache-Control", "no-store, no-cache, must-revalidate, max-age=0") // Prevent special(ed) browsers from caching the challenge
 			c.SendString(`<script>let hasMemApi=!1,useMem=!1,hasKnownMem=!1,startMem=null,plugCh=!1,mimeCh=!1;function calcSolution(e){let i=0;for(var t=Math.pow(e,7);t>=0;t--)i+=Math.atan(t)*Math.tan(t);return!0}if(void 0!=performance.memory){if(hasMemApi=!0,startMem=performance.memory,161e5==performance.memory.totalJSHeapSize||127e5==performance.memory.usedJSHeapSize||1e7==performance.memory.usedJSHeapSize||219e4==performance.memory.jsHeapSizeLimit)for(hasKnownMem=!0;calcSolution(performance.memory.usedJSHeapSize);)0>performance.now()&&(hasKnownMem=!1);else calcSolution(8)}if(hasMemApi){let e=performance.memory;if(startMem.usedJSHeapSize==e.usedJSHeapSize&&startMem.jsHeapSizeLimit==e.jsHeapSizeLimit&&startMem.totalJSHeapSize==e.totalJSHeapSize)for(useMem=!0;calcSolution(performance.memory.usedJSHeapSize);)0>performance.now()&&(hasKnownMem=!1)}let pluginString=Object.getOwnPropertyDescriptor(Object.getPrototypeOf(navigator),"plugins").get.toString();"function get plugins() { [native code] }"!=pluginString&&"function plugins() {\n        [native code]\n    }"!=pluginString&&"function plugins() {\n    [native code]\n}"!=pluginString&&(plugCh=!0);let mimeString=Object.getOwnPropertyDescriptor(Object.getPrototypeOf(navigator),"plugins").get.toString();"function get plugins() { [native code] }"!=mimeString&&"function plugins() {\n        [native code]\n    }"!=mimeString&&"function plugins() {\n    [native code]\n}"!=mimeString&&(mimeCh=!0),mimeCh||plugCh||useMem||hasKnownMem||(document.cookie="_2__bProxy_v=` + encryptedIP + `; SameSite=Lax; path=/; Secure",location.href=location.href);</script>`)
 			return
 		case 3:
@@ -244,6 +245,7 @@ func Middleware(c *fiber.Ctx) {
 			}
 
 			c.Append("Content-Type", "text/html")
+			c.Append("Cache-Control", "no-store, no-cache, must-revalidate, max-age=0") // Prevent special(ed) browsers from caching the challenge
 			c.SendString(`
 			<html>
 			<head>
@@ -477,13 +479,13 @@ padding: 20px;
 
 	//Access logs of clients that passed the challenge
 	if browser != "" || botFp != "" {
-		access := "[ " + utils.RedText(proxy.LastSecondTime.Format("15:04:05")) + " ] > \033[35m" + ip + "\033[0m - \033[32m" + browser + botFp + "\033[0m - " + utils.RedText(reqUa) + " - " + utils.RedText(cOURL)
+		access := "[ " + utils.PrimaryColor(proxy.LastSecondTime.Format("15:04:05")) + " ] > \033[35m" + ip + "\033[0m - \033[32m" + browser + botFp + "\033[0m - " + utils.PrimaryColor(reqUa) + " - " + utils.PrimaryColor(cOURL)
 		firewall.Mutex.Lock()
 		domainData = utils.AddLogs(access, domainName)
 		firewall.AccessIps[ip] = firewall.AccessIps[ip] + 1
 		firewall.Mutex.Unlock()
 	} else {
-		access := "[ " + utils.RedText(proxy.LastSecondTime.Format("15:04:05")) + " ] > \033[35m" + ip + "\033[0m - \033[31mUNK (" + tlsFp + ")\033[0m - " + utils.RedText(reqUa) + " - " + utils.RedText(cOURL)
+		access := "[ " + utils.PrimaryColor(proxy.LastSecondTime.Format("15:04:05")) + " ] > \033[35m" + ip + "\033[0m - \033[31mUNK (" + tlsFp + ")\033[0m - " + utils.PrimaryColor(reqUa) + " - " + utils.PrimaryColor(cOURL)
 		firewall.Mutex.Lock()
 		domainData = utils.AddLogs(access, domainName)
 		firewall.AccessIps[ip] = firewall.AccessIps[ip] + 1
