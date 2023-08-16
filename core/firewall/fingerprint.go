@@ -3,9 +3,6 @@ package firewall
 import (
 	"crypto/tls"
 	"fmt"
-	"strings"
-
-	"goProxy/core/proxy"
 )
 
 var (
@@ -73,19 +70,6 @@ func Fingerprint(clientHello *tls.ClientHelloInfo) (*tls.Config, error) {
 	}
 
 	remoteAddr := clientHello.Conn.RemoteAddr().String()
-
-	ip := strings.Split(remoteAddr, ":")[0]
-
-	Mutex.Lock()
-	ipCount := AccessIps[ip]
-	ipCountCookie := AccessIpsCookie[ip]
-	Mutex.Unlock()
-
-	//Ignore ratelimited Ips
-	if ipCount > proxy.IPRatelimit || ipCountCookie > proxy.FailChallengeRatelimit {
-		defer clientHello.Conn.Close()
-		return nil, nil
-	}
 
 	fingerprint := ""
 

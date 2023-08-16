@@ -81,13 +81,14 @@ type DomainData struct {
 }
 
 type Proxy struct {
-	Cloudflare  bool              `json:"cloudflare"`
-	AdminSecret string            `json:"adminsecret"`
-	APISecret   string            `json:"apisecret"`
-	Secrets     map[string]string `json:"secrets"`
-	Timeout     TimeoutSettings   `json:"timeout"`
-	Ratelimits  map[string]int    `json:"ratelimits"`
-	Colors      []string          `json:"colors"`
+	Cloudflare      bool              `json:"cloudflare"`
+	AdminSecret     string            `json:"adminsecret"`
+	APISecret       string            `json:"apisecret"`
+	Secrets         map[string]string `json:"secrets"`
+	Timeout         TimeoutSettings   `json:"timeout"`
+	RatelimitWindow int               `json:"ratelimit_time"`
+	Ratelimits      map[string]int    `json:"ratelimits"`
+	Colors          []string          `json:"colors"`
 }
 
 type TimeoutSettings struct {

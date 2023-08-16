@@ -110,7 +110,7 @@ func Middleware(c *fiber.Ctx) {
 		}
 
 		firewall.Mutex.Lock()
-		firewall.UnkFps[tlsFp] = firewall.UnkFps[tlsFp] + 1
+		firewall.WindowUnkFps[proxy.Last10SecondTimestamp][tlsFp]++
 		firewall.Mutex.Unlock()
 	}
 
@@ -195,7 +195,7 @@ func Middleware(c *fiber.Ctx) {
 	if !strings.Contains(reqHeaders["Cookie"], "__bProxy_v="+encryptedIP) {
 
 		firewall.Mutex.Lock()
-		firewall.AccessIpsCookie[ip] = firewall.AccessIpsCookie[ip] + 1
+		firewall.WindowAccessIpsCookie[proxy.Last10SecondTimestamp][ip]++
 		firewall.Mutex.Unlock()
 
 		//Respond with verification challenge if client didnt provide correct result/none
@@ -484,13 +484,13 @@ padding: 20px;
 		access := "[ " + utils.PrimaryColor(proxy.LastSecondTime.Format("15:04:05")) + " ] > \033[35m" + ip + "\033[0m - \033[32m" + browser + botFp + "\033[0m - " + utils.PrimaryColor(reqUa) + " - " + utils.PrimaryColor(cOURL)
 		firewall.Mutex.Lock()
 		domainData = utils.AddLogs(access, domainName)
-		firewall.AccessIps[ip] = firewall.AccessIps[ip] + 1
+		firewall.WindowAccessIps[proxy.Last10SecondTimestamp][ip]++
 		firewall.Mutex.Unlock()
 	} else {
 		access := "[ " + utils.PrimaryColor(proxy.LastSecondTime.Format("15:04:05")) + " ] > \033[35m" + ip + "\033[0m - \033[31mUNK (" + tlsFp + ")\033[0m - " + utils.PrimaryColor(reqUa) + " - " + utils.PrimaryColor(cOURL)
 		firewall.Mutex.Lock()
 		domainData = utils.AddLogs(access, domainName)
-		firewall.AccessIps[ip] = firewall.AccessIps[ip] + 1
+		firewall.WindowAccessIps[proxy.Last10SecondTimestamp][ip]++
 		firewall.Mutex.Unlock()
 	}
 

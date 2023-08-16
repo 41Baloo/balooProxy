@@ -41,6 +41,11 @@ func Monitor() {
 	screen.MoveTopLeft()
 	PrintMutex.Unlock()
 
+	proxy.LastSecondTime = time.Now()
+	proxy.LastSecondTimestamp = int(proxy.LastSecondTime.Unix())
+	proxy.Last10SecondTimestamp = utils.TrimTime(proxy.LastSecondTimestamp)
+	proxy.CurrHour, _, _ = proxy.LastSecondTime.Clock()
+
 	//Responsible for handeling user-commands
 	go commands()
 
@@ -49,6 +54,9 @@ func Monitor() {
 
 	//Responsible for generating non-bruteforable secrets
 	go generateOTPSecrets()
+
+	//Responsible for keeping track of ratelimit
+	go evaluateRatelimit()
 
 	PrintMutex.Lock()
 	fmt.Println("\033[" + fmt.Sprint(11+proxy.MaxLogLength) + ";1H")
@@ -207,6 +215,8 @@ func checkAttack(domainName string, domainData domains.DomainData) {
 func printStats() {
 
 	proxy.LastSecondTime = time.Now()
+	proxy.LastSecondTimestamp = int(proxy.LastSecondTime.Unix())
+	proxy.Last10SecondTimestamp = utils.TrimTime(proxy.LastSecondTimestamp)
 	proxy.CurrHour, _, _ = proxy.LastSecondTime.Clock()
 
 	result, err := cpu.Percent(0, false)
@@ -557,18 +567,6 @@ func clearProxyCache() {
 	for {
 		//Clear logs and maps every 2 minutes. (I know this is a lazy way to do it, tho for now it seems to be the most efficient and fast way to go about it)
 		firewall.Mutex.Lock()
-		for tcpRequest := range firewall.TcpRequests {
-			delete(firewall.TcpRequests, tcpRequest)
-		}
-		for unk := range firewall.UnkFps {
-			delete(firewall.UnkFps, unk)
-		}
-		for ip := range firewall.AccessIps {
-			delete(firewall.AccessIps, ip)
-		}
-		for ipCookie := range firewall.AccessIpsCookie {
-			delete(firewall.AccessIpsCookie, ipCookie)
-		}
 
 		proxyCpuUsage, pcuErr := strconv.ParseFloat(proxy.CpuUsage, 32)
 		if pcuErr != nil {
@@ -611,6 +609,67 @@ func clearProxyCache() {
 		}
 		firewall.Mutex.Unlock()
 		time.Sleep(2 * time.Minute)
+	}
+}
+
+// Iterate through the slider every 5 seconds
+func evaluateRatelimit() {
+	for {
+
+		firewall.Mutex.Lock()
+		//Initialise Maps before they're every written, as to save if statements during potential attack
+		for i := proxy.Last10SecondTimestamp; i < proxy.Last10SecondTimestamp+20; i = i + 10 {
+			if firewall.WindowAccessIps[i] == nil {
+				firewall.WindowAccessIps[i] = map[string]int{}
+			}
+		}
+		for i := proxy.Last10SecondTimestamp; i < proxy.Last10SecondTimestamp+20; i = i + 10 {
+			if firewall.WindowAccessIpsCookie[i] == nil {
+				firewall.WindowAccessIpsCookie[i] = map[string]int{}
+			}
+		}
+		for i := proxy.Last10SecondTimestamp; i < proxy.Last10SecondTimestamp+20; i = i + 10 {
+			if firewall.WindowUnkFps[i] == nil {
+				firewall.WindowUnkFps[i] = map[string]int{}
+			}
+		}
+
+		// Delete outdated records & calculate requests for every ip
+		firewall.AccessIps = map[string]int{}
+		for windowTime, accessIPs := range firewall.WindowAccessIps {
+			if utils.TrimTime(windowTime)+proxy.RatelimitWindow < proxy.LastSecondTimestamp {
+				delete(firewall.WindowAccessIps, windowTime)
+			} else {
+				for IP, requests := range accessIPs {
+					firewall.AccessIps[IP] += requests
+				}
+			}
+		}
+		firewall.AccessIpsCookie = map[string]int{}
+		for windowTime, accessIPsCookie := range firewall.WindowAccessIpsCookie {
+			if utils.TrimTime(windowTime)+proxy.RatelimitWindow < proxy.LastSecondTimestamp {
+				delete(firewall.WindowAccessIpsCookie, windowTime)
+			} else {
+				for IP, requests := range accessIPsCookie {
+					firewall.AccessIpsCookie[IP] += requests
+				}
+			}
+		}
+		firewall.UnkFps = map[string]int{}
+		for windowTime, unkFps := range firewall.WindowUnkFps {
+			if utils.TrimTime(windowTime)+proxy.RatelimitWindow < proxy.LastSecondTimestamp {
+				delete(firewall.WindowUnkFps, windowTime)
+			} else {
+				for IP, requests := range unkFps {
+					firewall.UnkFps[IP] += requests
+				}
+			}
+		}
+		firewall.Mutex.Unlock()
+		proxy.Initialised = true
+
+		time.Sleep(5 * time.Second)
+
 	}
 }
 

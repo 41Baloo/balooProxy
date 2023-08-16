@@ -166,6 +166,6 @@ func JsonEscape(i string) string {
 	return string(b[1 : len(b)-1])
 }
 
-func ChooseText() {
-
+func TrimTime(timestamp int) int {
+	return (timestamp / 10) * 10
 }

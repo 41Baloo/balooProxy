@@ -38,6 +38,8 @@ var (
 	WriteTimeoutDuration      = time.Duration(WriteTimeout).Abs() * time.Second
 	ReadHeaderTimeoutDuration = time.Duration(ReadHeaderTimeout).Abs() * time.Second
 
+	RatelimitWindow = 120
+
 	IPRatelimit            int
 	FPRatelimit            int
 	FailChallengeRatelimit int
@@ -45,6 +47,10 @@ var (
 
 	RealTimeLogs = false
 
-	CurrHour       int
-	LastSecondTime time.Time
+	CurrHour              int
+	LastSecondTime        time.Time
+	LastSecondTimestamp   int
+	Last10SecondTimestamp int
+
+	Initialised = false
 )

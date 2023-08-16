@@ -4,10 +4,12 @@ import (
 	"fmt"
 	"goProxy/core/config"
 	"goProxy/core/pnc"
+	"goProxy/core/proxy"
 	"goProxy/core/server"
 	"io"
 	"log"
 	"os"
+	"time"
 )
 
 func main() {
@@ -31,10 +33,14 @@ func main() {
 
 	fmt.Println("Loaded Config ...")
 
-	go server.Serve()
+	// Wait for everything to be initialised
+	fmt.Println("Initialising ...")
 	go server.Monitor()
+	for !proxy.Initialised {
+		time.Sleep(500 * time.Millisecond)
+	}
 
-	fmt.Println("Started!")
+	go server.Serve()
 
 	//Keep server running
 	select {}
