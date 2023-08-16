@@ -47,9 +47,6 @@ func Monitor() {
 	//Responsible for clearing outdated cache and data
 	go clearProxyCache()
 
-	//Responsible for clearing outdated websitecache
-	go clearOutdatedCache()
-
 	//Responsible for generating non-bruteforable secrets
 	go generateOTPSecrets()
 
@@ -388,13 +385,6 @@ func commands() {
 				}
 				fmt.Println("\033[" + fmt.Sprint(12+proxy.MaxLogLength) + ";1H")
 				fmt.Print("[ " + utils.PrimaryColor("Command") + " ]: \033[s")
-			case "delcache":
-				screen.Clear()
-				screen.MoveTopLeft()
-				fmt.Println("[ " + utils.PrimaryColor("Clearing Cache For "+proxy.WatchedDomain) + " ] ...")
-				clearCache()
-				fmt.Println("\033[" + fmt.Sprint(12+proxy.MaxLogLength) + ";1H")
-				fmt.Print("[ " + utils.PrimaryColor("Command") + " ]: \033[s")
 			case "reload":
 				screen.Clear()
 				screen.MoveTopLeft()
@@ -407,18 +397,6 @@ func commands() {
 				screen.Clear()
 				screen.MoveTopLeft()
 				fmt.Println("[ " + utils.PrimaryColor("Loading") + " ] ...")
-				fmt.Println("\033[" + fmt.Sprint(12+proxy.MaxLogLength) + ";1H")
-				fmt.Print("[ " + utils.PrimaryColor("Command") + " ]: \033[s")
-			case "cachemode":
-				screen.Clear()
-				screen.MoveTopLeft()
-				if proxy.CacheEnabled {
-					proxy.CacheEnabled = false
-					fmt.Println("[ " + utils.PrimaryColor("Turning Caching Off") + " ] ...")
-				} else {
-					proxy.CacheEnabled = true
-					fmt.Println("[ " + utils.PrimaryColor("Turning Caching On") + " ] ...")
-				}
 				fmt.Println("\033[" + fmt.Sprint(12+proxy.MaxLogLength) + ";1H")
 				fmt.Print("[ " + utils.PrimaryColor("Command") + " ]: \033[s")
 			default:
@@ -503,21 +481,6 @@ func reloadConfig() {
 			})
 		}
 
-		cacheRules := []domains.Rule{}
-		rawCacheRules := domains.Config.Domains[i].CacheRules
-		for _, caRule := range domains.Config.Domains[i].CacheRules {
-
-			rule, err := gofilter.NewFilter(caRule.Expression)
-			if err != nil {
-				panic("[ " + utils.PrimaryColor("!") + " ] [ Error Loading Custom Cache Rules: " + utils.PrimaryColor(err.Error()) + " ]")
-			}
-
-			cacheRules = append(cacheRules, domains.Rule{
-				Filter: rule,
-				Action: caRule.Action,
-			})
-		}
-
 		dProxy := httputil.NewSingleHostReverseProxy(&url.URL{
 			Scheme: domain.Scheme,
 			Host:   domain.Backend,
@@ -541,9 +504,6 @@ func reloadConfig() {
 			CustomRules:    firewallRules,
 			IPInfo:         ipInfo,
 			RawCustomRules: rawFirewallRules,
-
-			CacheRules:    cacheRules,
-			RawCacheRules: rawCacheRules,
 
 			DomainProxy:        dProxyHandler,
 			DomainCertificates: cert,
@@ -651,39 +611,6 @@ func clearProxyCache() {
 		}
 		firewall.Mutex.Unlock()
 		time.Sleep(2 * time.Minute)
-	}
-}
-
-func clearCache() {
-	domains.DomainsCache.Range(func(key, value any) bool {
-		cacheResp := value.(domains.CacheResponse)
-		if cacheResp.Domain == proxy.WatchedDomain {
-			domains.DomainsCache.Delete(key)
-		}
-		return true
-	})
-}
-
-func clearOutdatedCache() {
-
-	defer pnc.PanicHndl()
-
-	for {
-		currTime := int(time.Now().Unix())
-		domains.DomainsCache.Range(func(key, value any) bool {
-			cacheResp := value.(domains.CacheResponse)
-			if cacheResp.Timestamp < currTime {
-				domains.DomainsCache.Delete(key)
-			}
-			return true
-		})
-		reloadConfig()
-
-		firewall.Mutex.Lock()
-		utils.AddLogs("Cleared Outdated Cache", "debug")
-		firewall.Mutex.Unlock()
-
-		time.Sleep(5 * time.Hour)
 	}
 }
 

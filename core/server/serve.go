@@ -1,14 +1,12 @@
 package server
 
 import (
-	"bytes"
 	"context"
 	"crypto/tls"
 	"goProxy/core/domains"
 	"goProxy/core/firewall"
 	"goProxy/core/pnc"
 	"goProxy/core/proxy"
-	"goProxy/core/utils"
 	"io"
 	"net"
 	"net/http"
@@ -17,7 +15,6 @@ import (
 
 	"github.com/goccy/go-json"
 	"github.com/gofiber/fiber/v2"
-	"github.com/kor44/gofilter"
 )
 
 type callbackListener struct {
@@ -48,6 +45,7 @@ func Serve() {
 	defer pnc.PanicHndl()
 
 	fbConfig := fiber.Config{
+		Network:                   "tcp",
 		DisableStartupMessage:     true,
 		DisableDefaultContentType: true,
 		JSONEncoder:               json.Marshal,
@@ -120,65 +118,6 @@ func Serve() {
 }
 
 func (rt *RoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
-
-	cacheRes := 0
-	reqIP := ""
-
-	if req.Method != "POST" && proxy.CacheEnabled {
-
-		domainSettings := req.Context().Value("domain").(domains.DomainSettings)
-		messages := req.Context().Value("filter").(gofilter.Message)
-
-		cacheRes = evalCache(domainSettings, messages)
-
-		if cacheRes != 0 {
-			var cacheResponse any
-			cacheOk := false
-			cacheKey := ""
-
-			switch cacheRes {
-			case proxy.CACHE_DEFAULT:
-				cacheKey = req.Host + req.URL.Path + req.URL.RawQuery + req.Method
-			case proxy.CACHE_DEFAULT_STRICT:
-				cacheKey = req.Host + req.URL.Path + req.URL.RawQuery
-			case proxy.CACHE_CAREFUL:
-				reqIP = strings.Split(req.RemoteAddr, ":")[0]
-				cacheKey = req.Host + reqIP + req.URL.Path + req.URL.RawQuery + req.Method
-			case proxy.CACHE_CAREFUL_STRICT:
-				reqIP = strings.Split(req.RemoteAddr, ":")[0]
-				cacheKey = req.Host + reqIP + req.URL.Path + req.URL.RawQuery
-			case proxy.CACHE_IGNORE_QUERY:
-				cacheKey = req.Host + req.URL.Path
-			case proxy.CACHE_QUERY:
-				cacheKey = req.Host + req.URL.RawQuery
-			case proxy.CACHE_CLIENTIP:
-				reqIP = strings.Split(req.RemoteAddr, ":")[0]
-				cacheKey = req.Host + reqIP
-			default:
-			}
-
-			cacheResponse, cacheOk = domains.DomainsCache.Load(cacheKey)
-
-			if cacheOk {
-				cachedResp := cacheResponse.(domains.CacheResponse)
-
-				//Check if cache is expired
-				if cachedResp.Timestamp > int(proxy.LastSecondTime.Unix()) {
-
-					resp := &http.Response{
-						StatusCode: cachedResp.Status,
-						Header:     cachedResp.Headers,
-						Body:       io.NopCloser(bytes.NewReader(cachedResp.Body)),
-					}
-
-					resp.Header.Set("proxy-cache", "HIT")
-					return resp, nil
-				}
-
-				domains.DomainsCache.Delete(req.Host + req.URL.Path + req.URL.RawQuery)
-			}
-		}
-	}
 
 	//Use Proxy Read Timeout
 	transport := &http.Transport{
@@ -411,78 +350,7 @@ func (rt *RoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
 		}, nil
 	}
 
-	resp.Header.Set("proxy-cache", "MISS")
-
-	if cacheRes != 0 && req.Method != "POST" && proxy.CacheEnabled {
-		if resp.StatusCode < 300 || (resp.StatusCode < 500 && resp.StatusCode >= 400) {
-			bodyBytes, bodyErr := io.ReadAll(resp.Body)
-
-			resp.Body = io.NopCloser(bytes.NewReader(bodyBytes))
-
-			if bodyErr != nil {
-				return &http.Response{
-					StatusCode: http.StatusBadGateway,
-					Body:       io.NopCloser(strings.NewReader("BalooProxy: Failed to read responsebody of backend")),
-				}, bodyErr
-			}
-
-			var cacheKey string
-			switch cacheRes {
-			case proxy.CACHE_DEFAULT:
-				cacheKey = req.Host + req.URL.Path + req.URL.RawQuery + req.Method
-			case proxy.CACHE_DEFAULT_STRICT:
-				cacheKey = req.Host + req.URL.Path + req.URL.RawQuery
-			case proxy.CACHE_CAREFUL:
-				cacheKey = req.Host + reqIP + req.URL.Path + req.URL.RawQuery + req.Method
-			case proxy.CACHE_CAREFUL_STRICT:
-				cacheKey = req.Host + reqIP + req.URL.Path + req.URL.RawQuery
-			case proxy.CACHE_IGNORE_QUERY:
-				cacheKey = req.Host + req.URL.Path
-			case proxy.CACHE_QUERY:
-				cacheKey = req.Host + req.URL.RawQuery
-			case proxy.CACHE_CLIENTIP:
-				cacheKey = req.Host + reqIP
-			default:
-				panic("[ " + utils.PrimaryColor("Error") + " ]: " + utils.PrimaryColor("Cache Error: Failed to get correct cache resp"))
-			}
-
-			domains.DomainsCache.Store(cacheKey, domains.CacheResponse{
-				Domain:    resp.Request.Host,
-				Timestamp: int(proxy.LastSecondTime.Unix()) + 3600, //Cache for an hour
-				Status:    resp.StatusCode,
-				Headers:   resp.Header,
-				Body:      bodyBytes,
-			})
-		}
-	}
 	return resp, nil
-}
-
-func evalCache(domainSettings domains.DomainSettings, message gofilter.Message) int {
-	for _, rule := range domainSettings.CacheRules {
-		if rule.Filter.Apply(message) {
-			switch rule.Action {
-			case "BYPASS":
-				return 0
-			case "DEFAULT":
-				return proxy.CACHE_DEFAULT
-			case "DEFAULT_STRICT":
-				return proxy.CACHE_DEFAULT_STRICT
-			case "CAREFUL":
-				return proxy.CACHE_CAREFUL
-			case "CAREFUL_STRICT":
-				return proxy.CACHE_CAREFUL_STRICT
-			case "IGNORE_QUERY":
-				return proxy.CACHE_IGNORE_QUERY
-			case "QUERY":
-				return proxy.CACHE_QUERY
-			case "CLIENTIP":
-				return proxy.CACHE_CLIENTIP
-			default:
-			}
-		}
-	}
-	return 0
 }
 
 type RoundTripper struct {

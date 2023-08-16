@@ -168,3 +168,27 @@ goProxy/core/server.Serve()
 created by main.main
 	/workspaces/balooProxy/main.go:34 +0x174
 
+[ 12:51:39 ]: Caught Panic: [ [0;31m![0m ] [ JS Secret Contains 'CHANGE_ME', Refusing To Load ]
+
+goroutine 1 [running]:
+goProxy/core/pnc.PanicHndl()
+	/workspaces/balooProxy/core/pnc/panicHandler.go:26 +0x7a
+panic({0x873d80, 0xc0000258a0})
+	/usr/local/go/src/runtime/panic.go:884 +0x213
+goProxy/core/config.Load()
+	/workspaces/balooProxy/core/config/init.go:48 +0x16e5
+main.main()
+	/workspaces/balooProxy/main.go:30 +0x12a
+
+[ 12:24:41 ]: Caught Panic: failed to listen: listen hhh: unknown network hhh
+
+goroutine 25 [running]:
+goProxy/core/pnc.PanicHndl()
+	/workspaces/balooProxy/core/pnc/panicHandler.go:26 +0x7a
+panic({0x88d020, 0xc00030a040})
+	/usr/local/go/src/runtime/panic.go:884 +0x213
+goProxy/core/server.Serve()
+	/workspaces/balooProxy/core/server/serve.go:71 +0x4d0
+created by main.main
+	/workspaces/balooProxy/main.go:34 +0x174
+

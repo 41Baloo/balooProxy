@@ -121,23 +121,6 @@ func Load() {
 			})
 		}
 
-		cacheRules := []domains.Rule{}
-		rawCacheRules := domains.Config.Domains[i].CacheRules
-		for _, caRule := range domains.Config.Domains[i].CacheRules {
-
-			proxy.CacheEnabled = true
-
-			rule, err := gofilter.NewFilter(caRule.Expression)
-			if err != nil {
-				panic("[ " + utils.PrimaryColor("!") + " ] [ Error Loading Custom Cache Rules: " + utils.PrimaryColor(err.Error()) + " ]")
-			}
-
-			cacheRules = append(cacheRules, domains.Rule{
-				Filter: rule,
-				Action: caRule.Action,
-			})
-		}
-
 		dProxy := httputil.NewSingleHostReverseProxy(&url.URL{
 			Scheme: domain.Scheme,
 			Host:   domain.Backend,
@@ -161,9 +144,6 @@ func Load() {
 			CustomRules:    firewallRules,
 			IPInfo:         ipInfo,
 			RawCustomRules: rawFirewallRules,
-
-			CacheRules:    cacheRules,
-			RawCacheRules: rawCacheRules,
 
 			DomainProxy:        dProxyHandler,
 			DomainCertificates: cert,

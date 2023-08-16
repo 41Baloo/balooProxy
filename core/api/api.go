@@ -120,10 +120,6 @@ func Process(c *fiber.Ctx, domainData domains.DomainData) bool {
 		APIResponse(c, true, map[string]interface{}{
 			"FIREWALL_RULES": apiDomain.(domains.DomainSettings).RawCustomRules,
 		})
-	case "GET_CACHE_RULES":
-		APIResponse(c, true, map[string]interface{}{
-			"CACHE_RULES": apiDomain.(domains.DomainSettings).RawCacheRules,
-		})
 	// This is still janky since it contains the formatting from the console & also changes size depending on the console size
 	case "GET_LOGS":
 		APIResponse(c, true, map[string]interface{}{

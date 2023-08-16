@@ -141,11 +141,6 @@ This field allows you to customise/enable discord DDoS alert notifications. It s
 
 Refer to [Custom Firewall Rules](#Custom-Firewall-Rules)
 
-### **Cache Rules**
----
-
-Refer to [Custom Cache Rules](#Custom-cache-rules)
-
 # **Terminal**
 
 ## **Main Hud**
@@ -207,13 +202,6 @@ The command `add` prompts you with questions to add another domain to your proxy
 
 The command `rtlogs` enables "real time logs", meaning the terminal log will not, like usually, update every second with the latest logs but will instead instantly update, as soon as there is another request to log. Notice, this might require a lot of cpu when your proxy is getting attacked
 
-### `cachemode`
-
-The command `cachemode` toggles whether or not the proxy tries to cache content on and off. If you don't have any custom cache rules, this is disabled by default. It is suggested not to turn on if you don't have any custom cache rules, as it might lead to increased cpu usage
-
-### `delcache`
-
-The command `delcache` allows you to instantly clear the cache of the domain you are currently watching
 
 ### `reload`
 
@@ -504,42 +492,3 @@ You can also set actions more dynamically by using a `+` in front of the `action
 ```
 
 In this example, the rule checks whether or not the request is made by a known browser. If not, the `susLv` gets raised by `1`.
-
-# **Custom Cache Rules**
-
-Similar to `Custom Firewall Rules`, you can make custom cache rules in order to control what content is temporarily stored on balooProxy (for 2 hours), to make content delivery faster. The same `fields` are able to be used, however actions are different.
-
-## **Cache Actions**
----
-
-### `BYPASS`
-
-Do not cache and ignore following cache rules that match the request
-
-### `DEFAULT`
-
-Use `Path` + `Query` + `Method` as cache-key. Best general action to cache content
-
-### `DEFAULT_STRICT`
-
-Use `Path` + `Query` as cache-key. Be carefull using this, as it might expose private data when used incorrectly
-
-### `CAREFUL`
-
-Use `IP` + `Path` + `Query` + `Method` as cache-key. Same as `DEFAULT` but bound to `IPs` aswell
-
-### `CAREFUL_STRICT`
-
-Use `IP` + `Path` + `Query` as cache-key. Same as `DEFAULT_STRICT` but bound to `IPs` aswell
-
-### `IGNORE_QUERY`
-
-Use `Path` as cache-key. Ignoring `Querys` and random `Query` spam. `POST` requests will still "bypass" this, as `POST` requests are excluded from cache
-
-### `QUERY`
-
-Use `Query` as cache-key. The same `Query` for different `Paths`/`Methods` will return the same result
-
-### `CLIENTIP`
-
-Use `IP` as cache-key. The same `IP` will always get the same result

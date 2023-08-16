@@ -5,8 +5,8 @@
         "adminsecret": "CHANGE_ME",
         "apisecret": "CHANGE_ME",
         "secrets": {
-            "captcha": "CHANG_ME1",
-            "cookie": "CHANG_ME2",
+            "captcha": "CHANGE_ME1",
+            "cookie": "CHANGE_ME2",
             "javascript": "CHANGE_ME3"
         },
         "timeout": {
@@ -29,7 +29,7 @@
     "domains": [
         {
             "name": "baloo.one",
-            "backend": "1.1.1.1",
+            "backend": "[::1]",
             "scheme": "http",
             "certificate": "assets/server/server.crt",
             "key": "assets/server/server.key",
@@ -58,14 +58,80 @@
                     "action": "+2"
                 }
             ],
-            "cacheRules": [
+            "bypassStage1": 75,
+            "bypassStage2": 250,
+            "disableBypassStage3": 100,
+            "disableRawStage3": 250,
+            "disableBypassStage2": 50,
+            "disableRawStage2": 75
+        },
+        {
+            "name": "9090.baloo.dog",
+            "backend": "1.1.1.1:9090",
+            "scheme": "http",
+            "certificate": "assets/server/server.crt",
+            "key": "assets/server/server.key",
+            "webhook": {
+                "url": "https://discord.com/api/webhooks/1055573557880569886/XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX",
+                "name": "balooProxy",
+                "avatar": "https://avatars.githubusercontent.com/u/73783549",
+                "attack_start_msg": "A DDoS attack has been detected against your domain `{{domain.name}}`",
+                "attack_stop_msg": "The DDoS attack against your domain `{{domain.name}}` has stopped"
+            },
+            "firewallRules": [
                 {
-                    "expression": "(http.path contains \".js\" or http.path contains \".ico\" or http.path contains \".css\")",
-                    "action": "DEFAULT"
+                    "expression": "(http.path eq \"/captcha\")",
+                    "action": "3"
                 },
                 {
-                    "expression": "(http.path eq \"/my-ip\")",
-                    "action": "CLIENTIP"
+                    "expression": "(http.path eq \"/js\")",
+                    "action": "2"
+                },
+                {
+                    "expression": "(ip.engine eq \"\" or ((ip.engine eq \"Firefox\" and http.user_agent contains \"chrome\") or (ip.engine eq \"Chromium\" and http.user_agent contains \"firefox\")))",
+                    "action": "+1"
+                },
+                {
+                    "expression": "(http.method ne \"GET\" and http.method ne \"POST\")",
+                    "action": "+2"
+                }
+            ],
+            "bypassStage1": 75,
+            "bypassStage2": 250,
+            "disableBypassStage3": 100,
+            "disableRawStage3": 250,
+            "disableBypassStage2": 50,
+            "disableRawStage2": 75
+        },
+        {
+            "name": "baloo.dog",
+            "backend": "1.1.1.1",
+            "scheme": "http",
+            "certificate": "assets/server/server.crt",
+            "key": "assets/server/server.key",
+            "webhook": {
+                "url": "https://discord.com/api/webhooks/1055573557880569886/XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX",
+                "name": "balooProxy",
+                "avatar": "https://avatars.githubusercontent.com/u/73783549",
+                "attack_start_msg": "A DDoS attack has been detected against your domain `{{domain.name}}`",
+                "attack_stop_msg": "The DDoS attack against your domain `{{domain.name}}` has stopped"
+            },
+            "firewallRules": [
+                {
+                    "expression": "(http.path eq \"/captcha\")",
+                    "action": "3"
+                },
+                {
+                    "expression": "(http.path eq \"/js\")",
+                    "action": "2"
+                },
+                {
+                    "expression": "(ip.engine eq \"\" or ((ip.engine eq \"Firefox\" and http.user_agent contains \"chrome\") or (ip.engine eq \"Chromium\" and http.user_agent contains \"firefox\")))",
+                    "action": "+1"
+                },
+                {
+                    "expression": "(http.method ne \"GET\" and http.method ne \"POST\")",
+                    "action": "+2"
                 }
             ],
             "bypassStage1": 75,

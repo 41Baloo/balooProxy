@@ -77,7 +77,6 @@ func AddDomain() {
 			AttackStopMsg:  utils.AskString("What Is The Message Your Webhook Should Send When Your Website Is No Longer Under Attack?", ""),
 		},
 		FirewallRules:       []domains.JsonRule{},
-		CacheRules:          []domains.JsonRule{},
 		BypassStage1:        utils.AskInt("At How Many Bypassing Requests Per Second Would You Like To Activate Stage 2?", 75),
 		BypassStage2:        utils.AskInt("At How Many Bypassing Requests Per Second Would You Like To Activate Stage 3?", 250),
 		DisableBypassStage3: utils.AskInt("How Many Bypassing Requests Per Second Are Low Enough To Disable Stage 3?", 100),

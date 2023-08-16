@@ -137,33 +137,35 @@ func Middleware(c *fiber.Ctx) {
 	cPath := c.Path()
 	cOURL := c.OriginalURL()
 
-	requestVariables := gofilter.Message{
-		"ip.src":                net.ParseIP(ip),
-		"ip.country":            ipInfoCountry,
-		"ip.asn":                ipInfoASN,
-		"ip.engine":             browser,
-		"ip.bot":                botFp,
-		"ip.fingerprint":        tlsFp,
-		"ip.http_requests":      ipCount,
-		"ip.challenge_requests": ipCountCookie,
+	if len(domainSettings.CustomRules) != 0 {
+		requestVariables := gofilter.Message{
+			"ip.src":                net.ParseIP(ip),
+			"ip.country":            ipInfoCountry,
+			"ip.asn":                ipInfoASN,
+			"ip.engine":             browser,
+			"ip.bot":                botFp,
+			"ip.fingerprint":        tlsFp,
+			"ip.http_requests":      ipCount,
+			"ip.challenge_requests": ipCountCookie,
 
-		"http.host":       c.Hostname(),
-		"http.method":     c.Method(),
-		"http.url":        c.BaseURL(),
-		"http.path":       cPath,
-		"http.user_agent": strings.ToLower(reqUa),
-		"http.cookie":     reqHeaders["Cookie"],
+			"http.host":       c.Hostname(),
+			"http.method":     c.Method(),
+			"http.url":        c.BaseURL(),
+			"http.path":       cPath,
+			"http.user_agent": strings.ToLower(reqUa),
+			"http.cookie":     reqHeaders["Cookie"],
 
-		"proxy.stage":         domainData.Stage,
-		"proxy.cloudflare":    domains.Config.Proxy.Cloudflare,
-		"proxy.stage_locked":  domainData.StageManuallySet,
-		"proxy.attack":        domainData.RawAttack,
-		"proxy.bypass_attack": domainData.BypassAttack,
-		"proxy.rps":           domainData.RequestsPerSecond,
-		"proxy.rps_allowed":   domainData.RequestsBypassedPerSecond,
+			"proxy.stage":         domainData.Stage,
+			"proxy.cloudflare":    domains.Config.Proxy.Cloudflare,
+			"proxy.stage_locked":  domainData.StageManuallySet,
+			"proxy.attack":        domainData.RawAttack,
+			"proxy.bypass_attack": domainData.BypassAttack,
+			"proxy.rps":           domainData.RequestsPerSecond,
+			"proxy.rps_allowed":   domainData.RequestsBypassedPerSecond,
+		}
+
+		susLv = firewall.EvalFirewallRule(domainSettings, requestVariables, susLv)
 	}
-
-	susLv = firewall.EvalFirewallRule(domainSettings, requestVariables, susLv)
 
 	//Check if encryption-result is already "cached" to prevent load on reverse proxy
 	encryptedIP := ""
@@ -491,9 +493,6 @@ padding: 20px;
 		firewall.AccessIps[ip] = firewall.AccessIps[ip] + 1
 		firewall.Mutex.Unlock()
 	}
-
-	c.Locals("filter", requestVariables)
-	c.Locals("domain", domainSettings)
 
 	firewall.Mutex.Lock()
 	domainData = domains.DomainsData[domainName]

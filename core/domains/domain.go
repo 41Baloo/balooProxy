@@ -11,11 +11,10 @@ import (
 )
 
 var (
-	Domains      = []string{}
-	DomainsMap   sync.Map
-	DomainsData  = map[string]DomainData{}
-	DomainsCache sync.Map
-	Config       *Configuration
+	Domains     = []string{}
+	DomainsMap  sync.Map
+	DomainsData = map[string]DomainData{}
+	Config      *Configuration
 )
 
 type Configuration struct {
@@ -31,7 +30,6 @@ type Domain struct {
 	Key                 string          `json:"key"`
 	Webhook             WebhookSettings `json:"webhook"`
 	FirewallRules       []JsonRule      `json:"firewallRules"`
-	CacheRules          []JsonRule      `json:"cacheRules"`
 	BypassStage1        int             `json:"bypassStage1"`
 	BypassStage2        int             `json:"bypassStage2"`
 	DisableBypassStage3 int             `json:"disableBypassStage3"`
@@ -46,9 +44,6 @@ type DomainSettings struct {
 	CustomRules    []Rule
 	IPInfo         bool
 	RawCustomRules []JsonRule
-
-	CacheRules    []Rule
-	RawCacheRules []JsonRule
 
 	DomainProxy        func(*fiber.Ctx) error
 	DomainCertificates tls.Certificate
