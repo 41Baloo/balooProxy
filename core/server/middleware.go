@@ -80,6 +80,7 @@ func Middleware(c *fiber.Ctx) {
 	}
 
 	firewall.Mutex.Lock()
+	firewall.WindowAccessIps[proxy.Last10SecondTimestamp][ip]++
 	domainData = domains.DomainsData[domainName]
 	domainData.TotalRequests++
 	domains.DomainsData[domainName] = domainData
@@ -484,13 +485,11 @@ padding: 20px;
 		access := "[ " + utils.PrimaryColor(proxy.LastSecondTime.Format("15:04:05")) + " ] > \033[35m" + ip + "\033[0m - \033[32m" + browser + botFp + "\033[0m - " + utils.PrimaryColor(reqUa) + " - " + utils.PrimaryColor(cOURL)
 		firewall.Mutex.Lock()
 		domainData = utils.AddLogs(access, domainName)
-		firewall.WindowAccessIps[proxy.Last10SecondTimestamp][ip]++
 		firewall.Mutex.Unlock()
 	} else {
 		access := "[ " + utils.PrimaryColor(proxy.LastSecondTime.Format("15:04:05")) + " ] > \033[35m" + ip + "\033[0m - \033[31mUNK (" + tlsFp + ")\033[0m - " + utils.PrimaryColor(reqUa) + " - " + utils.PrimaryColor(cOURL)
 		firewall.Mutex.Lock()
 		domainData = utils.AddLogs(access, domainName)
-		firewall.WindowAccessIps[proxy.Last10SecondTimestamp][ip]++
 		firewall.Mutex.Unlock()
 	}
 
