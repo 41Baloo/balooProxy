@@ -192,3 +192,51 @@ goProxy/core/server.Serve()
 created by main.main
 	/workspaces/balooProxy/main.go:34 +0x174
 
+[ 21:09:23 ]: Caught Panic: 1
+
+goroutine 13 [running]:
+goProxy/core/pnc.PanicHndl()
+	/workspaces/balooProxy/core/pnc/panicHandler.go:26 +0x7a
+panic({0x7da160, 0x8fb078})
+	/usr/local/go/src/runtime/panic.go:884 +0x213
+goProxy/core/server.Serve()
+	/workspaces/balooProxy/core/server/serve.go:51 +0x11b
+created by main.main
+	/workspaces/balooProxy/main.go:43 +0x1d3
+
+[ 21:32:23 ]: Caught Panic: 1
+
+goroutine 32 [running]:
+goProxy/core/pnc.PanicHndl()
+	/workspaces/balooProxy/core/pnc/panicHandler.go:26 +0x7a
+panic({0x7da160, 0x8fb078})
+	/usr/local/go/src/runtime/panic.go:884 +0x213
+goProxy/core/server.Serve()
+	/workspaces/balooProxy/core/server/serve.go:51 +0x11b
+created by main.main
+	/workspaces/balooProxy/main.go:43 +0x1d3
+
+[ 21:52:23 ]: Caught Panic: 1
+
+goroutine 22 [running]:
+goProxy/core/pnc.PanicHndl()
+	/workspaces/balooProxy/core/pnc/panicHandler.go:26 +0x7a
+panic({0x7da160, 0x8fb078})
+	/usr/local/go/src/runtime/panic.go:884 +0x213
+goProxy/core/server.Serve()
+	/workspaces/balooProxy/core/server/serve.go:51 +0x11b
+created by main.main
+	/workspaces/balooProxy/main.go:43 +0x1d3
+
+[ 21:09:24 ]: Caught Panic: 1
+
+goroutine 35 [running]:
+goProxy/core/pnc.PanicHndl()
+	/workspaces/balooProxy/core/pnc/panicHandler.go:26 +0x7a
+panic({0x7da160, 0x8fb078})
+	/usr/local/go/src/runtime/panic.go:884 +0x213
+goProxy/core/server.Serve()
+	/workspaces/balooProxy/core/server/serve.go:51 +0x11b
+created by main.main
+	/workspaces/balooProxy/main.go:43 +0x1d3
+

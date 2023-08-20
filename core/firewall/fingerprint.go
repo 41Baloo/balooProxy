@@ -59,30 +59,25 @@ func Fingerprint(clientHello *tls.ClientHelloInfo) (*tls.Config, error) {
 		return nil, nil
 	}
 
-	if !(len(clientHello.SupportedCurves) > 0) {
-		defer clientHello.Conn.Close()
-		return nil, nil
-	}
-
-	if !(len(clientHello.SupportedPoints) > 0) {
-		defer clientHello.Conn.Close()
-		return nil, nil
-	}
-
 	remoteAddr := clientHello.Conn.RemoteAddr().String()
 
 	fingerprint := ""
 
 	//Loop over clientHello parameters and ignore first elements of arrays since they may be randomised by certain browsers
+
 	for _, suite := range clientHello.CipherSuites[1:] {
 		fingerprint += fmt.Sprintf("0x%x,", suite)
 	}
 
-	for _, curve := range clientHello.SupportedCurves[1:] {
-		fingerprint += fmt.Sprintf("0x%x,", curve)
+	if !(len(clientHello.SupportedCurves) > 0) {
+		for _, curve := range clientHello.SupportedCurves[1:] {
+			fingerprint += fmt.Sprintf("0x%x,", curve)
+		}
 	}
-	for _, point := range clientHello.SupportedPoints[:1] {
-		fingerprint += fmt.Sprintf("0x%x,", point)
+	if !(len(clientHello.SupportedPoints) > 0) {
+		for _, point := range clientHello.SupportedPoints[:1] {
+			fingerprint += fmt.Sprintf("0x%x,", point)
+		}
 	}
 
 	//Remember what connection has what fingerprint for later use
