@@ -7,7 +7,6 @@ import (
 	"goProxy/core/firewall"
 	"goProxy/core/pnc"
 	"goProxy/core/proxy"
-	"goProxy/core/utils"
 	"io"
 	"net"
 	"net/http"
@@ -352,11 +351,6 @@ func (rt *RoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
 	return resp, nil
 }
 
-func (lc *loggingConn) Close() error {
-	utils.AddLogs("Connection to backend: "+lc.backendDomain+" is being closed", "debug")
-	return lc.Conn.Close()
-}
-
 func getTripperForDomain(domain string) *http.Transport {
 
 	transport, ok := transportMap.Load(domain)
@@ -365,16 +359,9 @@ func getTripperForDomain(domain string) *http.Transport {
 	} else {
 		transport := &http.Transport{
 			DialContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
-				conn, err := (&net.Dialer{
+				return (&net.Dialer{
 					Timeout: 5 * time.Second,
 				}).DialContext(ctx, network, addr)
-				if err != nil {
-					return nil, err
-				}
-
-				utils.AddLogs("Connecting to backend: "+domain, "debug")
-
-				return &loggingConn{Conn: conn, backendDomain: domain}, nil
 			},
 			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
 			IdleConnTimeout: 90 * time.Second,
@@ -386,9 +373,4 @@ func getTripperForDomain(domain string) *http.Transport {
 }
 
 type RoundTripper struct {
-}
-
-type loggingConn struct {
-	net.Conn
-	backendDomain string
 }
