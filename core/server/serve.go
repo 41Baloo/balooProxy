@@ -7,14 +7,20 @@ import (
 	"goProxy/core/firewall"
 	"goProxy/core/pnc"
 	"goProxy/core/proxy"
+	"goProxy/core/utils"
 	"io"
 	"net"
 	"net/http"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/goccy/go-json"
 	"github.com/gofiber/fiber/v2"
+)
+
+var (
+	transportMap = sync.Map{}
 )
 
 type callbackListener struct {
@@ -120,14 +126,7 @@ func Serve() {
 func (rt *RoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
 
 	//Use Proxy Read Timeout
-	transport := &http.Transport{
-		DialContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
-			return (&net.Dialer{
-				Timeout: 5 * time.Second,
-			}).DialContext(ctx, network, addr)
-		},
-		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
-	}
+	transport := getTripperForDomain(req.Host)
 
 	//Use inbuild RoundTrip
 	resp, err := transport.RoundTrip(req)
@@ -353,5 +352,43 @@ func (rt *RoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
 	return resp, nil
 }
 
+func (lc *loggingConn) Close() error {
+	utils.AddLogs("Connection to backend: "+lc.backendDomain+" is being closed", "debug")
+	return lc.Conn.Close()
+}
+
+func getTripperForDomain(domain string) *http.Transport {
+
+	transport, ok := transportMap.Load(domain)
+	if ok {
+		return transport.(*http.Transport)
+	} else {
+		transport := &http.Transport{
+			DialContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
+				conn, err := (&net.Dialer{
+					Timeout: 5 * time.Second,
+				}).DialContext(ctx, network, addr)
+				if err != nil {
+					return nil, err
+				}
+
+				utils.AddLogs("Connecting to backend: "+domain, "debug")
+
+				return &loggingConn{Conn: conn, backendDomain: domain}, nil
+			},
+			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+			IdleConnTimeout: 90 * time.Second,
+			MaxIdleConns:    10,
+		}
+		racedTransport, _ := transportMap.LoadOrStore(domain, transport)
+		return racedTransport.(*http.Transport)
+	}
+}
+
 type RoundTripper struct {
+}
+
+type loggingConn struct {
+	net.Conn
+	backendDomain string
 }

@@ -69,12 +69,12 @@ func Fingerprint(clientHello *tls.ClientHelloInfo) (*tls.Config, error) {
 		fingerprint += fmt.Sprintf("0x%x,", suite)
 	}
 
-	if !(len(clientHello.SupportedCurves) > 0) {
+	if len(clientHello.SupportedCurves) > 0 {
 		for _, curve := range clientHello.SupportedCurves[1:] {
 			fingerprint += fmt.Sprintf("0x%x,", curve)
 		}
 	}
-	if !(len(clientHello.SupportedPoints) > 0) {
+	if len(clientHello.SupportedPoints) > 0 {
 		for _, point := range clientHello.SupportedPoints[:1] {
 			fingerprint += fmt.Sprintf("0x%x,", point)
 		}
