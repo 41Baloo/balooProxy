@@ -27,7 +27,7 @@ func Middleware(c *fiber.Ctx) {
 	defer pnc.PanicHndl()
 
 	reqHeaders := c.GetReqHeaders()
-	domainName := reqHeaders["Host"]
+	domainName := utils.SafeString(reqHeaders["Host"])
 	firewall.Mutex.Lock()
 	domainData := domains.DomainsData[domainName]
 	firewall.Mutex.Unlock()
@@ -36,8 +36,6 @@ func Middleware(c *fiber.Ctx) {
 		c.SendString("balooProxy: " + domainName + " does not exist. If you are the owner please check your config.json if you believe this is a mistake")
 		return
 	}
-
-	domainName = domainData.Name
 
 	var ip string
 	var tlsFp string
@@ -52,7 +50,7 @@ func Middleware(c *fiber.Ctx) {
 
 	if domains.Config.Proxy.Cloudflare {
 
-		ip = reqHeaders["Cf-Connecting-Ip"]
+		ip = utils.SafeString(reqHeaders["Cf-Connecting-Ip"])
 
 		tlsFp = "Cloudflare"
 		browser = "Cloudflare"
@@ -136,7 +134,8 @@ func Middleware(c *fiber.Ctx) {
 
 	reqUa := string(cContext.UserAgent())
 	cPath := c.Path()
-	cOURL := c.OriginalURL()
+	cOURL := utils.SafeString(c.OriginalURL())
+	cookieString := utils.SafeString(reqHeaders["Cookie"])
 
 	if len(domainSettings.CustomRules) != 0 {
 		requestVariables := gofilter.Message{
@@ -149,12 +148,12 @@ func Middleware(c *fiber.Ctx) {
 			"ip.http_requests":      ipCount,
 			"ip.challenge_requests": ipCountCookie,
 
-			"http.host":       c.Hostname(),
+			"http.host":       domainName,
 			"http.method":     c.Method(),
 			"http.url":        c.BaseURL(),
 			"http.path":       cPath,
 			"http.user_agent": strings.ToLower(reqUa),
-			"http.cookie":     reqHeaders["Cookie"],
+			"http.cookie":     cookieString,
 
 			"proxy.stage":         domainData.Stage,
 			"proxy.cloudflare":    domains.Config.Proxy.Cloudflare,
@@ -193,7 +192,7 @@ func Middleware(c *fiber.Ctx) {
 	}
 
 	//Check if client provided correct verification result
-	if !strings.Contains(reqHeaders["Cookie"], "__bProxy_v="+encryptedIP) {
+	if !strings.Contains(cookieString, "__bProxy_v="+encryptedIP) {
 
 		firewall.Mutex.Lock()
 		firewall.WindowAccessIpsCookie[proxy.Last10SecondTimestamp][ip]++

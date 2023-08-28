@@ -169,3 +169,7 @@ func JsonEscape(i string) string {
 func TrimTime(timestamp int) int {
 	return (timestamp / 10) * 10
 }
+
+func SafeString(str string) string {
+	return string([]byte(str))
+}
