@@ -42,9 +42,11 @@ func Monitor() {
 	PrintMutex.Unlock()
 
 	proxy.LastSecondTime = time.Now()
+	proxy.LastSecondTimeFormated = proxy.LastSecondTime.Format("15:04:05")
 	proxy.LastSecondTimestamp = int(proxy.LastSecondTime.Unix())
 	proxy.Last10SecondTimestamp = utils.TrimTime(proxy.LastSecondTimestamp)
 	proxy.CurrHour, _, _ = proxy.LastSecondTime.Clock()
+	proxy.CurrHourStr = strconv.Itoa(proxy.CurrHour)
 
 	//Responsible for handeling user-commands
 	go commands()
@@ -215,9 +217,11 @@ func checkAttack(domainName string, domainData domains.DomainData) {
 func printStats() {
 
 	proxy.LastSecondTime = time.Now()
+	proxy.LastSecondTimeFormated = proxy.LastSecondTime.Format("15:04:05")
 	proxy.LastSecondTimestamp = int(proxy.LastSecondTime.Unix())
 	proxy.Last10SecondTimestamp = utils.TrimTime(proxy.LastSecondTimestamp)
 	proxy.CurrHour, _, _ = proxy.LastSecondTime.Clock()
+	proxy.CurrHourStr = strconv.Itoa(proxy.CurrHour)
 
 	result, err := cpu.Percent(0, false)
 	if err != nil {
@@ -622,13 +626,9 @@ func evaluateRatelimit() {
 			if firewall.WindowAccessIps[i] == nil {
 				firewall.WindowAccessIps[i] = map[string]int{}
 			}
-		}
-		for i := proxy.Last10SecondTimestamp; i < proxy.Last10SecondTimestamp+20; i = i + 10 {
 			if firewall.WindowAccessIpsCookie[i] == nil {
 				firewall.WindowAccessIpsCookie[i] = map[string]int{}
 			}
-		}
-		for i := proxy.Last10SecondTimestamp; i < proxy.Last10SecondTimestamp+20; i = i + 10 {
 			if firewall.WindowUnkFps[i] == nil {
 				firewall.WindowUnkFps[i] = map[string]int{}
 			}

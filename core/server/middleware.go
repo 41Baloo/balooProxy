@@ -169,24 +169,25 @@ func Middleware(c *fiber.Ctx) {
 
 	//Check if encryption-result is already "cached" to prevent load on reverse proxy
 	encryptedIP := ""
-	susLvStr := strconv.Itoa(susLv)
-	encryptedCache, encryptedExists := firewall.CacheIps.Load(ip + susLvStr)
+	susLvStr := utils.StageToString(susLv)
+	accessKey := ip + tlsFp + reqUa + proxy.CurrHourStr
+	encryptedCache, encryptedExists := firewall.CacheIps.Load(accessKey + susLvStr)
 
 	if !encryptedExists {
 		switch susLv {
 		case 0:
 			//whitelisted
 		case 1:
-			encryptedIP = utils.Encrypt(ip+tlsFp+reqUa+strconv.Itoa(proxy.CurrHour), proxy.CookieOTP)
+			encryptedIP = utils.Encrypt(accessKey, proxy.CookieOTP)
 		case 2:
-			encryptedIP = utils.Encrypt(ip+tlsFp+reqUa+strconv.Itoa(proxy.CurrHour), proxy.JSOTP)
+			encryptedIP = utils.Encrypt(accessKey, proxy.JSOTP)
 		case 3:
-			encryptedIP = utils.Encrypt(ip+tlsFp+reqUa+strconv.Itoa(proxy.CurrHour), proxy.CaptchaOTP)
+			encryptedIP = utils.Encrypt(accessKey, proxy.CaptchaOTP)
 		default:
 			c.SendString("Blocked by BalooProxy.\nSuspicious request of level " + susLvStr)
 			return
 		}
-		firewall.CacheIps.Store(ip+susLvStr, encryptedIP)
+		firewall.CacheIps.Store(accessKey+susLvStr, encryptedIP)
 	} else {
 		encryptedIP = encryptedCache.(string)
 	}
@@ -203,13 +204,13 @@ func Middleware(c *fiber.Ctx) {
 		case 0:
 			//This request is not to be challenged (whitelist)
 		case 1:
-			c.Append("Set-Cookie", "_1__bProxy_v="+encryptedIP+"; SameSite=Lax; path=/; Secure")
+			c.Append("Set-Cookie", "_1__bProxy_v="+encryptedIP+"; SameSite=None; path=/; Secure")
 			c.Redirect(cOURL, 302)
 			return
 		case 2:
 			c.Append("Content-Type", "text/html")
 			c.Append("Cache-Control", "no-store, no-cache, must-revalidate, max-age=0") // Prevent special(ed) browsers from caching the challenge
-			c.SendString(`<script>let hasMemApi=!1,useMem=!1,hasKnownMem=!1,startMem=null,plugCh=!1,mimeCh=!1;function calcSolution(e){let i=0;for(var t=Math.pow(e,7);t>=0;t--)i+=Math.atan(t)*Math.tan(t);return!0}if(void 0!=performance.memory){if(hasMemApi=!0,startMem=performance.memory,161e5==performance.memory.totalJSHeapSize||127e5==performance.memory.usedJSHeapSize||1e7==performance.memory.usedJSHeapSize||219e4==performance.memory.jsHeapSizeLimit)for(hasKnownMem=!0;calcSolution(performance.memory.usedJSHeapSize);)0>performance.now()&&(hasKnownMem=!1);else calcSolution(8)}if(hasMemApi){let e=performance.memory;if(startMem.usedJSHeapSize==e.usedJSHeapSize&&startMem.jsHeapSizeLimit==e.jsHeapSizeLimit&&startMem.totalJSHeapSize==e.totalJSHeapSize)for(useMem=!0;calcSolution(performance.memory.usedJSHeapSize);)0>performance.now()&&(hasKnownMem=!1)}let pluginString=Object.getOwnPropertyDescriptor(Object.getPrototypeOf(navigator),"plugins").get.toString();"function get plugins() { [native code] }"!=pluginString&&"function plugins() {\n        [native code]\n    }"!=pluginString&&"function plugins() {\n    [native code]\n}"!=pluginString&&(plugCh=!0);let mimeString=Object.getOwnPropertyDescriptor(Object.getPrototypeOf(navigator),"plugins").get.toString();"function get plugins() { [native code] }"!=mimeString&&"function plugins() {\n        [native code]\n    }"!=mimeString&&"function plugins() {\n    [native code]\n}"!=mimeString&&(mimeCh=!0),mimeCh||plugCh||useMem||hasKnownMem||(document.cookie="_2__bProxy_v=` + encryptedIP + `; SameSite=Lax; path=/; Secure",location.href=location.href);</script>`)
+			c.SendString(`<script>let hasMemApi=!1,useMem=!1,hasKnownMem=!1,startMem=null,plugCh=!1,mimeCh=!1;function calcSolution(e){let i=0;for(var t=Math.pow(e,7);t>=0;t--)i+=Math.atan(t)*Math.tan(t);return!0}if(void 0!=performance.memory){if(hasMemApi=!0,startMem=performance.memory,161e5==performance.memory.totalJSHeapSize||127e5==performance.memory.usedJSHeapSize||1e7==performance.memory.usedJSHeapSize||219e4==performance.memory.jsHeapSizeLimit)for(hasKnownMem=!0;calcSolution(performance.memory.usedJSHeapSize);)0>performance.now()&&(hasKnownMem=!1);else calcSolution(8)}if(hasMemApi){let e=performance.memory;if(startMem.usedJSHeapSize==e.usedJSHeapSize&&startMem.jsHeapSizeLimit==e.jsHeapSizeLimit&&startMem.totalJSHeapSize==e.totalJSHeapSize)for(useMem=!0;calcSolution(performance.memory.usedJSHeapSize);)0>performance.now()&&(hasKnownMem=!1)}let pluginString=Object.getOwnPropertyDescriptor(Object.getPrototypeOf(navigator),"plugins").get.toString();"function get plugins() { [native code] }"!=pluginString&&"function plugins() {\n        [native code]\n    }"!=pluginString&&"function plugins() {\n    [native code]\n}"!=pluginString&&(plugCh=!0);let mimeString=Object.getOwnPropertyDescriptor(Object.getPrototypeOf(navigator),"plugins").get.toString();"function get plugins() { [native code] }"!=mimeString&&"function plugins() {\n        [native code]\n    }"!=mimeString&&"function plugins() {\n    [native code]\n}"!=mimeString&&(mimeCh=!0),mimeCh||plugCh||useMem||hasKnownMem||(document.cookie="_2__bProxy_v=` + encryptedIP + `; SameSite=None; path=/; Secure",location.href=location.href);</script>`)
 			return
 		case 3:
 			secretPart := encryptedIP[:6]
@@ -407,7 +408,7 @@ padding: 20px;
 				// Get the user's input
 				var input = document.getElementById('text').value;
 
-				document.cookie = '` + ip + `_3__bProxy_v='+input+'` + publicPart + `; SameSite=Lax; path=/; Secure';
+				document.cookie = '` + ip + `_3__bProxy_v='+input+'` + publicPart + `; SameSite=None; path=/; Secure';
 
 				// Check if the input is correct
 				fetch('https://' + location.hostname + '/_bProxy/verified').then(function(response) {
@@ -481,12 +482,12 @@ padding: 20px;
 
 	//Access logs of clients that passed the challenge
 	if browser != "" || botFp != "" {
-		access := "[ " + utils.PrimaryColor(proxy.LastSecondTime.Format("15:04:05")) + " ] > \033[35m" + ip + "\033[0m - \033[32m" + browser + botFp + "\033[0m - " + utils.PrimaryColor(reqUa) + " - " + utils.PrimaryColor(cOURL)
+		access := "[ " + utils.PrimaryColor(proxy.LastSecondTimeFormated) + " ] > \033[35m" + ip + "\033[0m - \033[32m" + browser + botFp + "\033[0m - " + utils.PrimaryColor(reqUa) + " - " + utils.PrimaryColor(cOURL)
 		firewall.Mutex.Lock()
 		domainData = utils.AddLogs(access, domainName)
 		firewall.Mutex.Unlock()
 	} else {
-		access := "[ " + utils.PrimaryColor(proxy.LastSecondTime.Format("15:04:05")) + " ] > \033[35m" + ip + "\033[0m - \033[31mUNK (" + tlsFp + ")\033[0m - " + utils.PrimaryColor(reqUa) + " - " + utils.PrimaryColor(cOURL)
+		access := "[ " + utils.PrimaryColor(proxy.LastSecondTimeFormated) + " ] > \033[35m" + ip + "\033[0m - \033[31mUNK (" + tlsFp + ")\033[0m - " + utils.PrimaryColor(reqUa) + " - " + utils.PrimaryColor(cOURL)
 		firewall.Mutex.Lock()
 		domainData = utils.AddLogs(access, domainName)
 		firewall.Mutex.Unlock()
@@ -502,7 +503,7 @@ padding: 20px;
 
 	switch cPath {
 	case "/_bProxy/stats":
-		c.SendString("Stage: " + strconv.Itoa(domainData.Stage) + "\nTotal Requests: " + strconv.Itoa(domainData.TotalRequests) + "\nBypassed Requests: " + strconv.Itoa(domainData.BypassedRequests) + "\nTotal R/s: " + strconv.Itoa(domainData.RequestsPerSecond) + "\nBypassed R/s: " + strconv.Itoa(domainData.RequestsBypassedPerSecond))
+		c.SendString("Stage: " + utils.StageToString(domainData.Stage) + "\nTotal Requests: " + strconv.Itoa(domainData.TotalRequests) + "\nBypassed Requests: " + strconv.Itoa(domainData.BypassedRequests) + "\nTotal R/s: " + strconv.Itoa(domainData.RequestsPerSecond) + "\nBypassed R/s: " + strconv.Itoa(domainData.RequestsBypassedPerSecond))
 		return
 	case "/_bProxy/fingerprint":
 		c.SendString("IP: " + ip + "\nASN: " + ipInfoASN + "\nCountry: " + ipInfoCountry + "\nIP Requests: " + strconv.Itoa(ipCount) + "\nIP Challenge Requests: " + strconv.Itoa(ipCountCookie) + "\nSusLV: " + strconv.Itoa(susLv) + "\nFingerprint: " + tlsFp + "\nBrowser: " + browser + botFp)
@@ -518,7 +519,7 @@ padding: 20px;
 
 	//Do not remove or modify this. It is required by the license
 	case "/_bProxy/credits":
-		c.SendString("BalooProxy; Lightweight http reverse-proxy https://github.com/41Baloo/balooProxy. Protected by GNU GENERAL PUBLIC LICENSE Version 2, June 1991")
+		c.SendString("BalooProxy Lite; Lightweight http reverse-proxy https://github.com/41Baloo/balooProxy. Protected by GNU GENERAL PUBLIC LICENSE Version 2, June 1991")
 		return
 	}
 

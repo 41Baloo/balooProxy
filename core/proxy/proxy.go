@@ -47,10 +47,12 @@ var (
 
 	RealTimeLogs = false
 
-	CurrHour              int
-	LastSecondTime        time.Time
-	LastSecondTimestamp   int
-	Last10SecondTimestamp int
+	CurrHour               int
+	CurrHourStr            string
+	LastSecondTime         time.Time
+	LastSecondTimeFormated string
+	LastSecondTimestamp    int
+	Last10SecondTimestamp  int
 
 	Initialised = false
 )

@@ -173,3 +173,18 @@ func TrimTime(timestamp int) int {
 func SafeString(str string) string {
 	return string([]byte(str))
 }
+
+func StageToString(stage int) string {
+	switch stage {
+	case 1:
+		return "1"
+	case 2:
+		return "2"
+	case 3:
+		return "3"
+	case 4:
+		return "4"
+	default:
+		return "5+"
+	}
+}
