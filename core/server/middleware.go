@@ -84,7 +84,7 @@ func Middleware(c *fiber.Ctx) {
 	domains.DomainsData[domainName] = domainData
 	firewall.Mutex.Unlock()
 
-	c.Append("baloo-proxy-lite", "1.4")
+	c.Append("baloo-proxy-lite", "1.5")
 
 	//Start the suspicious level where the stage currently is
 	susLv := domainData.Stage
