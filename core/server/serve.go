@@ -50,7 +50,7 @@ func Serve() {
 	defer pnc.PanicHndl()
 
 	fbConfig := fiber.Config{
-		Network:                   "tcp",
+		Network:                   domains.Config.Proxy.Network,
 		DisableStartupMessage:     true,
 		DisableDefaultContentType: true,
 		JSONEncoder:               json.Marshal,

@@ -7,6 +7,8 @@ const (
 )
 
 var (
+	Fingerprint string
+
 	WatchedDomain string
 	TWidth        int
 	THeight       int

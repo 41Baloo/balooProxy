@@ -503,7 +503,7 @@ padding: 20px;
 
 	switch cPath {
 	case "/_bProxy/stats":
-		c.SendString("Stage: " + utils.StageToString(domainData.Stage) + "\nTotal Requests: " + strconv.Itoa(domainData.TotalRequests) + "\nBypassed Requests: " + strconv.Itoa(domainData.BypassedRequests) + "\nTotal R/s: " + strconv.Itoa(domainData.RequestsPerSecond) + "\nBypassed R/s: " + strconv.Itoa(domainData.RequestsBypassedPerSecond))
+		c.SendString("Stage: " + utils.StageToString(domainData.Stage) + "\nTotal Requests: " + strconv.Itoa(domainData.TotalRequests) + "\nBypassed Requests: " + strconv.Itoa(domainData.BypassedRequests) + "\nTotal R/s: " + strconv.Itoa(domainData.RequestsPerSecond) + "\nBypassed R/s: " + strconv.Itoa(domainData.RequestsBypassedPerSecond) + "\nProxy Fingerprint: " + proxy.Fingerprint)
 		return
 	case "/_bProxy/fingerprint":
 		c.SendString("IP: " + ip + "\nASN: " + ipInfoASN + "\nCountry: " + ipInfoCountry + "\nIP Requests: " + strconv.Itoa(ipCount) + "\nIP Challenge Requests: " + strconv.Itoa(ipCountCookie) + "\nSusLV: " + strconv.Itoa(susLv) + "\nFingerprint: " + tlsFp + "\nBrowser: " + browser + botFp)

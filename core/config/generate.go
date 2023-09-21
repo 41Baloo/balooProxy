@@ -20,6 +20,7 @@ func Generate() {
 	gConfig := domains.Configuration{
 		Proxy: domains.Proxy{
 			Cloudflare:  utils.AskBool("Use This Proxy With Cloudflare? (y/N)", false),
+			Network:     "tcp",
 			AdminSecret: utils.RandomString(25),
 			APISecret:   utils.RandomString(30),
 			Timeout: domains.TimeoutSettings{

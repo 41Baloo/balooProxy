@@ -82,6 +82,7 @@ type DomainData struct {
 
 type Proxy struct {
 	Cloudflare      bool              `json:"cloudflare"`
+	Network         string            `json:"network"`
 	AdminSecret     string            `json:"adminsecret"`
 	APISecret       string            `json:"apisecret"`
 	Secrets         map[string]string `json:"secrets"`
