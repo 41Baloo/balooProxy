@@ -621,7 +621,7 @@ func evaluateRatelimit() {
 	for {
 
 		firewall.Mutex.Lock()
-		//Initialise Maps before they're every written, as to save if statements during potential attack
+		//Initialise Maps before they're ever written, as to save if statements during potential attack
 		for i := proxy.Last10SecondTimestamp; i < proxy.Last10SecondTimestamp+20; i = i + 10 {
 			if firewall.WindowAccessIps[i] == nil {
 				firewall.WindowAccessIps[i] = map[string]int{}

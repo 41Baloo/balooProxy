@@ -12,6 +12,8 @@ var (
 	WatchedDomain string
 	TWidth        int
 	THeight       int
+	Monitor       bool
+	LessRam       bool
 	Cloudflare    bool
 	MaxLogLength  int
 

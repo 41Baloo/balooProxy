@@ -81,6 +81,8 @@ type DomainData struct {
 }
 
 type Proxy struct {
+	Monitor         bool              `json:"monitor"`
+	LowRam          bool              `json:"low_ram"`
 	Cloudflare      bool              `json:"cloudflare"`
 	Network         string            `json:"network"`
 	AdminSecret     string            `json:"adminsecret"`

@@ -16,6 +16,7 @@ import (
 
 	"github.com/goccy/go-json"
 	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v2/middleware/monitor"
 )
 
 var (
@@ -50,6 +51,7 @@ func Serve() {
 	defer pnc.PanicHndl()
 
 	fbConfig := fiber.Config{
+		ReduceMemoryUsage:         domains.Config.Proxy.LowRam,
 		Network:                   domains.Config.Proxy.Network,
 		DisableStartupMessage:     true,
 		DisableDefaultContentType: true,
@@ -65,12 +67,15 @@ func Serve() {
 		httpServer := fiber.New(fbConfig)
 
 		httpServer.Use(func(c *fiber.Ctx) error {
-			Middleware(c)
-
-			return nil
+			return Middleware(c)
 		})
 
-		//service.Handler = http.HandlerFunc(Middleware)
+		if domains.Config.Proxy.Monitor {
+			httpServer.Get("/_bProxy/"+proxy.AdminSecret+"/monitor", monitor.New(monitor.Config{
+				Title:   "balooProxy Metrics",
+				Refresh: 1 * time.Second,
+			}))
+		}
 
 		if err := httpServer.Listen(":80"); err != nil {
 			panic(err)
@@ -104,10 +109,15 @@ func Serve() {
 		httpsServer.SetTLSHandler(tlsHandler)
 
 		httpsServer.Use(func(c *fiber.Ctx) error {
-			Middleware(c)
-
-			return nil
+			return Middleware(c)
 		})
+
+		if domains.Config.Proxy.Monitor {
+			httpsServer.Get("/_bProxy/"+proxy.AdminSecret+"/monitor", monitor.New(monitor.Config{
+				Title:   "balooProxy Metrics",
+				Refresh: 1 * time.Second,
+			}))
+		}
 
 		go func() {
 			defer pnc.PanicHndl()
@@ -271,7 +281,20 @@ func (rt *RoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
 			</html>
 		`
 
-		errBody, errErr := io.ReadAll(resp.Body)
+		limitReader := io.LimitReader(resp.Body, 1024*1024) // 1 MB for instance
+		errBody, errErr := io.ReadAll(limitReader)
+
+		// Close the original body
+		resp.Body.Close()
+
+		errMsg := ""
+		if errErr == nil && len(errBody) > 0 {
+			errMsg = string(errBody)
+			if int64(len(errBody)) == 1024*1024 {
+				errMsg += `<p>( Error message truncated. )</p>`
+			}
+		}
+
 		if errErr == nil && len(errBody) != 0 {
 			errPage =
 				`
@@ -331,7 +354,7 @@ func (rt *RoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
 							<p>Sorry, the backend returned this error.</p>
 							<iframe width="100%" height="25%" style="border:1px ridge lightgrey; border-radius: 5px;"
 							srcdoc="
-								` + string(errBody) + `">
+								` + errMsg + `">
 							</iframe>
 							<a onclick="location.reload()">Reload page</a>
 							</div>

@@ -22,7 +22,7 @@ import (
 	"github.com/kor44/gofilter"
 )
 
-func Middleware(c *fiber.Ctx) {
+func Middleware(c *fiber.Ctx) error {
 
 	defer pnc.PanicHndl()
 
@@ -34,7 +34,7 @@ func Middleware(c *fiber.Ctx) {
 
 	if domainData.Stage == 0 {
 		c.SendString("balooProxy: " + domainName + " does not exist. If you are the owner please check your config.json if you believe this is a mistake")
-		return
+		return nil
 	}
 
 	var ip string
@@ -92,20 +92,20 @@ func Middleware(c *fiber.Ctx) {
 	//Ratelimit faster if client repeatedly fails the verification challenge (feel free to play around with the threshhold)
 	if ipCountCookie > proxy.FailChallengeRatelimit {
 		c.SendString("Blocked by BalooProxy.\nYou have been ratelimited. (R1)")
-		return
+		return nil
 	}
 
 	//Ratelimit spamming Ips (feel free to play around with the threshhold)
 	if ipCount > proxy.IPRatelimit {
 		c.SendString("Blocked by BalooProxy.\nYou have been ratelimited. (R2)")
-		return
+		return nil
 	}
 
 	//Ratelimit fingerprints that don't belong to major browsers
 	if browser == "" {
 		if fpCount > proxy.FPRatelimit {
 			c.SendString("Blocked by BalooProxy.\nYou have been ratelimited. (R3)")
-			return
+			return nil
 		}
 
 		firewall.Mutex.Lock()
@@ -117,7 +117,7 @@ func Middleware(c *fiber.Ctx) {
 	forbiddenFp := firewall.ForbiddenFingerprints[tlsFp]
 	if forbiddenFp != "" {
 		c.SendString("Blocked by BalooProxy.\nYour browser " + forbiddenFp + " is not allowed.")
-		return
+		return nil
 	}
 
 	//Demonstration of how to use "susLv". Essentially allows you to challenge specific requests with a higher challenge
@@ -185,7 +185,7 @@ func Middleware(c *fiber.Ctx) {
 			encryptedIP = utils.Encrypt(accessKey, proxy.CaptchaOTP)
 		default:
 			c.SendString("Blocked by BalooProxy.\nSuspicious request of level " + susLvStr)
-			return
+			return nil
 		}
 		firewall.CacheIps.Store(accessKey+susLvStr, encryptedIP)
 	} else {
@@ -206,12 +206,12 @@ func Middleware(c *fiber.Ctx) {
 		case 1:
 			c.Append("Set-Cookie", "_1__bProxy_v="+encryptedIP+"; SameSite=Lax; path=/; Secure")
 			c.Redirect(cOURL, 302)
-			return
+			return nil
 		case 2:
 			c.Append("Content-Type", "text/html")
 			c.Append("Cache-Control", "no-store, no-cache, must-revalidate, max-age=0") // Prevent special(ed) browsers from caching the challenge
 			c.SendString(`<script>let hasMemApi=!1,useMem=!1,hasKnownMem=!1,startMem=null,plugCh=!1,mimeCh=!1;function calcSolution(e){let i=0;for(var t=Math.pow(e,7);t>=0;t--)i+=Math.atan(t)*Math.tan(t);return!0}if(void 0!=performance.memory){if(hasMemApi=!0,startMem=performance.memory,161e5==performance.memory.totalJSHeapSize||127e5==performance.memory.usedJSHeapSize||1e7==performance.memory.usedJSHeapSize||219e4==performance.memory.jsHeapSizeLimit)for(hasKnownMem=!0;calcSolution(performance.memory.usedJSHeapSize);)0>performance.now()&&(hasKnownMem=!1);else calcSolution(8)}if(hasMemApi){let e=performance.memory;if(startMem.usedJSHeapSize==e.usedJSHeapSize&&startMem.jsHeapSizeLimit==e.jsHeapSizeLimit&&startMem.totalJSHeapSize==e.totalJSHeapSize)for(useMem=!0;calcSolution(performance.memory.usedJSHeapSize);)0>performance.now()&&(hasKnownMem=!1)}let pluginString=Object.getOwnPropertyDescriptor(Object.getPrototypeOf(navigator),"plugins").get.toString();"function get plugins() { [native code] }"!=pluginString&&"function plugins() {\n        [native code]\n    }"!=pluginString&&"function plugins() {\n    [native code]\n}"!=pluginString&&(plugCh=!0);let mimeString=Object.getOwnPropertyDescriptor(Object.getPrototypeOf(navigator),"plugins").get.toString();"function get plugins() { [native code] }"!=mimeString&&"function plugins() {\n        [native code]\n    }"!=mimeString&&"function plugins() {\n    [native code]\n}"!=mimeString&&(mimeCh=!0),mimeCh||plugCh||useMem||hasKnownMem||(document.cookie="_2__bProxy_v=` + encryptedIP + `; SameSite=Lax; path=/; Secure",location.href=location.href);</script>`)
-			return
+			return nil
 		case 3:
 			secretPart := encryptedIP[:6]
 			publicPart := encryptedIP[6:]
@@ -236,7 +236,7 @@ func Middleware(c *fiber.Ctx) {
 				var buf bytes.Buffer
 				if err := png.Encode(&buf, captchaImg); err != nil {
 					c.SendString("BalooProxy Error: Failed to encode captcha: " + err.Error())
-					return
+					return nil
 				}
 				data := buf.Bytes()
 
@@ -473,10 +473,10 @@ padding: 20px;
 			}
 			</script>
 			`)
-			return
+			return nil
 		default:
 			c.SendString("Blocked by BalooProxy.\nSuspicious request of level " + susLvStr)
-			return
+			return nil
 		}
 	}
 
@@ -504,23 +504,25 @@ padding: 20px;
 	switch cPath {
 	case "/_bProxy/stats":
 		c.SendString("Stage: " + utils.StageToString(domainData.Stage) + "\nTotal Requests: " + strconv.Itoa(domainData.TotalRequests) + "\nBypassed Requests: " + strconv.Itoa(domainData.BypassedRequests) + "\nTotal R/s: " + strconv.Itoa(domainData.RequestsPerSecond) + "\nBypassed R/s: " + strconv.Itoa(domainData.RequestsBypassedPerSecond) + "\nProxy Fingerprint: " + proxy.Fingerprint)
-		return
+		return nil
 	case "/_bProxy/fingerprint":
 		c.SendString("IP: " + ip + "\nASN: " + ipInfoASN + "\nCountry: " + ipInfoCountry + "\nIP Requests: " + strconv.Itoa(ipCount) + "\nIP Challenge Requests: " + strconv.Itoa(ipCountCookie) + "\nSusLV: " + strconv.Itoa(susLv) + "\nFingerprint: " + tlsFp + "\nBrowser: " + browser + botFp)
-		return
+		return nil
 	case "/_bProxy/verified":
 		c.SendString("verified")
-		return
+		return nil
 	case "/_bProxy/" + proxy.AdminSecret + "/api/v1":
 		result := api.Process(c, domainData)
 		if result {
-			return
+			return nil
 		}
+	case "/_bProxy/" + proxy.AdminSecret + "/monitor":
+		return c.Next()
 
 	//Do not remove or modify this. It is required by the license
 	case "/_bProxy/credits":
 		c.SendString("BalooProxy Lite; Lightweight http reverse-proxy https://github.com/41Baloo/balooProxy. Protected by GNU GENERAL PUBLIC LICENSE Version 2, June 1991")
-		return
+		return nil
 	}
 
 	//Allow backend to read client information
@@ -532,4 +534,5 @@ padding: 20px;
 	cRequest.Header.Add("Proxy-TLS-Name", browser+botFp)
 
 	domainSettings.DomainProxy(c)
+	return nil
 }

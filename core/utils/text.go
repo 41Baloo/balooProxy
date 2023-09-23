@@ -188,3 +188,21 @@ func StageToString(stage int) string {
 		return "5+"
 	}
 }
+
+func closestTo10(n int) int {
+	if n == 0 {
+		return 10
+	}
+
+	if n%10 >= 5 {
+		return (n/10 + 1) * 10
+	}
+
+	result := n / 10 * 10
+
+	if result == 0 {
+		return 10
+	}
+
+	return result
+}
