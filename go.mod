@@ -5,13 +5,13 @@ go 1.19
 require (
 	github.com/boltdb/bolt v1.3.1
 	github.com/kor44/gofilter v0.0.0-20171111115139-75787865c72c
-	golang.org/x/image v0.5.0
+	github.com/zeebo/blake3 v0.2.3
+	golang.org/x/image v0.10.0
 )
 
 require (
 	github.com/klauspost/cpuid/v2 v2.0.12 // indirect
 	github.com/stretchr/testify v1.8.1 // indirect
-	github.com/zeebo/blake3 v0.2.3 // indirect
 )
 
 require (
@@ -23,6 +23,6 @@ require (
 	github.com/tklauser/numcpus v0.6.0 // indirect
 	github.com/yusufpapurcu/wmi v1.2.2 // indirect
 	golang.org/x/crypto v0.1.0 // indirect
-	golang.org/x/sys v0.3.0 // indirect
-	golang.org/x/term v0.1.0
+	golang.org/x/sys v0.5.0 // indirect
+	golang.org/x/term v0.5.0
 )
