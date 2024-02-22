@@ -525,6 +525,11 @@ padding: 20px;
 		return nil
 	}
 
+	_, proxySecretFound := reqHeaders["Proxy-Secret"]
+	if proxySecretFound {
+		return c.Next() // Return here. This is a v2 api request
+	}
+
 	//Allow backend to read client information
 
 	cRequest := c.Request()

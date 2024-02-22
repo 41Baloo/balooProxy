@@ -492,3 +492,7 @@ You can also set actions more dynamically by using a `+` in front of the `action
 ```
 
 In this example, the rule checks whether or not the request is made by a known browser. If not, the `susLv` gets raised by `1`.
+
+# **API**
+
+A full documentation of BalooProxies 2.0 API can be found at https://app.swaggerhub.com/apis-docs/BalooProxy/BalooProxy/2.0.0#/

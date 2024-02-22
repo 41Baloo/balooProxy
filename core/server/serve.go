@@ -3,6 +3,7 @@ package server
 import (
 	"context"
 	"crypto/tls"
+	"goProxy/core/api"
 	"goProxy/core/domains"
 	"goProxy/core/firewall"
 	"goProxy/core/pnc"
@@ -76,6 +77,8 @@ func Serve() {
 				Refresh: 1 * time.Second,
 			}))
 		}
+
+		api.CreateAPIRoutes(httpServer) // API v2
 
 		if err := httpServer.Listen(":80"); err != nil {
 			panic(err)
