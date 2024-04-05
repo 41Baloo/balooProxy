@@ -81,6 +81,7 @@ type DomainData struct {
 }
 
 type Proxy struct {
+	HostBindAddress string            `json:"hostBindAddress"`
 	Cloudflare      bool              `json:"cloudflare"`
 	Network         string            `json:"network"`
 	AdminSecret     string            `json:"adminsecret"`

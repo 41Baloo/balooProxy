@@ -72,7 +72,7 @@ func Serve() {
 
 		//service.Handler = http.HandlerFunc(Middleware)
 
-		if err := httpServer.Listen(":80"); err != nil {
+		if err := httpServer.Listen(proxy.HostBindAddress + ":80"); err != nil {
 			panic(err)
 		}
 	} else {
@@ -87,7 +87,7 @@ func Serve() {
 		httpsServer := fiber.New(fbConfig)
 
 		tlsHandler := &fiber.TLSHandler{}
-		serverListener, errListener := tls.Listen("tcp", ":443", &tls.Config{
+		serverListener, errListener := tls.Listen("tcp", proxy.HostBindAddress+":443", &tls.Config{
 			GetConfigForClient: firewall.Fingerprint,
 			GetCertificate: func(chi *tls.ClientHelloInfo) (*tls.Certificate, error) {
 				tlsHandler.GetClientInfo(chi)

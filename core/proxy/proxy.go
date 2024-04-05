@@ -12,8 +12,10 @@ var (
 	WatchedDomain string
 	TWidth        int
 	THeight       int
-	Cloudflare    bool
-	MaxLogLength  int
+
+	HostBindAddress string
+	Cloudflare      bool
+	MaxLogLength    int
 
 	CpuUsage string
 	RamUsage string
