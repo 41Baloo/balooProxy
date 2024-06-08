@@ -16,6 +16,7 @@ import (
 	"net/http/httputil"
 	"net/url"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
@@ -115,14 +116,14 @@ func Load() {
 		ipInfo := false
 		firewallRules := []domains.Rule{}
 		rawFirewallRules := domains.Config.Domains[i].FirewallRules
-		for _, fwRule := range domains.Config.Domains[i].FirewallRules {
+		for index, fwRule := range domains.Config.Domains[i].FirewallRules {
 
 			if strings.Contains(fwRule.Expression, "ip.country") || strings.Contains(fwRule.Expression, "ip.asn") {
 				ipInfo = true
 			}
 			rule, err := gofilter.NewFilter(fwRule.Expression)
 			if err != nil {
-				panic("[ " + utils.PrimaryColor("!") + " ] [ Error Loading Custom Firewall Rules: " + utils.PrimaryColor(err.Error()) + " ]")
+				panic("[ " + utils.PrimaryColor("!") + " ] [ Error Loading Custom Firewall Rules For " + domain.Name + " ( Rule " + strconv.Itoa(index) + " ) : " + utils.PrimaryColor(err.Error()) + " ]")
 			}
 
 			firewallRules = append(firewallRules, domains.Rule{

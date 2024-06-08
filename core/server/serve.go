@@ -1,6 +1,7 @@
 package server
 
 import (
+	"bytes"
 	"context"
 	"crypto/tls"
 	"goProxy/core/api"
@@ -135,7 +136,18 @@ func Serve() {
 	}
 }
 
+// this should be more performant and reduce memory allocations
+var bufferPool = sync.Pool{
+	New: func() interface{} {
+		return &bytes.Buffer{}
+	},
+}
+
 func (rt *RoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
+
+	buffer := bufferPool.Get().(*bytes.Buffer)
+	buffer.Reset()
+	defer bufferPool.Put(buffer)
 
 	//Use Proxy Read Timeout
 	transport := getTripperForDomain(req.Host)
@@ -152,137 +164,22 @@ func (rt *RoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
 				errMsg += str + " "
 			}
 		}
-		errPage := `
-			<!DOCTYPE html>
-			<html>
-			<head>
-			<title>Error: ` + errMsg + `</title>
-			<style>
-				body {
-				font-family: 'Helvetica Neue', sans-serif;
-				color: #333;
-				margin: 0;
-				padding: 0;
-				}
-				.container {
-				display: flex;
-				align-items: center;
-				justify-content: center;
-				height: 100vh;
-				background: #fafafa;
-				}
-				.error-box {
-				width: 600px;
-				padding: 20px;
-				background: #fff;
-				border-radius: 5px;
-				box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-				}
-				.error-box h1 {
-				font-size: 36px;
-				margin-bottom: 20px;
-				}
-				.error-box p {
-				font-size: 16px;
-				line-height: 1.5;
-				margin-bottom: 20px;
-				}
-				.error-box p.description {
-				font-style: italic;
-				color: #666;
-				}
-				.error-box a {
-				display: inline-block;
-				padding: 10px 20px;
-				background: #00b8d4;
-				color: #fff;
-				border-radius: 5px;
-				text-decoration: none;
-				font-size: 16px;
-				}
-			</style>
-			</head>
-			<body>
-			<div class="container">
-				<div class="error-box">
-				<h1>Error: ` + errMsg + `</h1>
-				<p>Sorry, there was an error connecting to the backend. That's all we know.</p>
-				<a onclick="location.reload()">Reload page</a>
-				</div>
-			</div>
-			</body>
-			</html>
-		`
+
+		buffer.Reset()
+		buffer.WriteString(`<!DOCTYPE html><html><head><title>Error: `)
+		buffer.WriteString(errMsg) // Page Title
+		buffer.WriteString(`</title><style>body{font-family:'Helvetica Neue',sans-serif;color:#333;margin:0;padding:0}.container{display:flex;align-items:center;justify-content:center;height:100vh;background:#fafafa}.error-box{width:600px;padding:20px;background:#fff;border-radius:5px;box-shadow:0 2px 4px rgba(0,0,0,.1)}.error-box h1{font-size:36px;margin-bottom:20px}.error-box p{font-size:16px;line-height:1.5;margin-bottom:20px}.error-box p.description{font-style:italic;color:#666}.error-box a{display:inline-block;padding:10px 20px;background:#00b8d4;color:#fff;border-radius:5px;text-decoration:none;font-size:16px}</style><div class=container><div class=error-box><h1>Error: `)
+		buffer.WriteString(errMsg) // Page Body
+		buffer.WriteString(`</h1><p>Sorry, there was an error connecting to the backend. That's all we know.</p><a onclick="location.reload()">Reload page</a></div></div></body></html>`)
 
 		return &http.Response{
 			StatusCode: http.StatusOK,
-			Body:       io.NopCloser(strings.NewReader(errPage)),
+			Body:       io.NopCloser(bytes.NewReader(buffer.Bytes())),
 		}, nil
 	}
 
 	//Connection was successfull, got bad response tho
 	if resp.StatusCode > 499 && resp.StatusCode < 600 {
-		errPage := `
-			<!DOCTYPE html>
-			<html>
-			<head>
-			<title>Error: ` + resp.Status + `</title>
-			<style>
-				body {
-				font-family: 'Helvetica Neue', sans-serif;
-				color: #333;
-				margin: 0;
-				padding: 0;
-				}
-				.container {
-				display: flex;
-				align-items: center;
-				justify-content: center;
-				height: 100vh;
-				background: #fafafa;
-				}
-				.error-box {
-				width: 600px;
-				padding: 20px;
-				background: #fff;
-				border-radius: 5px;
-				box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-				}
-				.error-box h1 {
-				font-size: 36px;
-				margin-bottom: 20px;
-				}
-				.error-box p {
-				font-size: 16px;
-				line-height: 1.5;
-				margin-bottom: 20px;
-				}
-				.error-box p.description {
-				font-style: italic;
-				color: #666;
-				}
-				.error-box a {
-				display: inline-block;
-				padding: 10px 20px;
-				background: #00b8d4;
-				color: #fff;
-				border-radius: 5px;
-				text-decoration: none;
-				font-size: 16px;
-				}
-			</style>
-			</head>
-			<body>
-			<div class="container">
-				<div class="error-box">
-				<h1>Error: ` + resp.Status + `</h1>
-				<p>Sorry, the backend returned an error. That's all we know.</p>
-				<a onclick="location.reload()">Reload page</a>
-				</div>
-			</div>
-			</body>
-			</html>
-		`
 
 		limitReader := io.LimitReader(resp.Body, 1024*1024) // 1 MB for instance
 		errBody, errErr := io.ReadAll(limitReader)
@@ -299,78 +196,30 @@ func (rt *RoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
 		}
 
 		if errErr == nil && len(errBody) != 0 {
-			errPage =
-				`
-				<!DOCTYPE html>
-				<html>
-					<head>
-						<title>Error: ` + resp.Status + `</title>
-						<style>
-							body {
-							font-family: 'Helvetica Neue', sans-serif;
-							color: #333;
-							margin: 0;
-							padding: 0;
-							}
-							.container {
-							display: flex;
-							align-items: center;
-							justify-content: center;
-							height: 100vh;
-							background: #fafafa;
-							}
-							.error-box {
-							width: 600px;
-							padding: 20px;
-							background: #fff;
-							border-radius: 5px;
-							box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-							}
-							.error-box h1 {
-							font-size: 36px;
-							margin-bottom: 20px;
-							}
-							.error-box p {
-							font-size: 16px;
-							line-height: 1.5;
-							margin-bottom: 20px;
-							}
-							.error-box p.description {
-							font-style: italic;
-							color: #666;
-							}
-							.error-box a {
-							display: inline-block;
-							padding: 10px 20px;
-							background: #00b8d4;
-							color: #fff;
-							border-radius: 5px;
-							text-decoration: none;
-							font-size: 16px;
-							}
-						</style>
-					</head>
-					<body>
-						<div class="container">
-							<div class="error-box">
-							<h1>Error: ` + resp.Status + `</h1>
-							<p>Sorry, the backend returned this error.</p>
-							<iframe width="100%" height="25%" style="border:1px ridge lightgrey; border-radius: 5px;"
-							srcdoc="
-								` + errMsg + `">
-							</iframe>
-							<a onclick="location.reload()">Reload page</a>
-							</div>
-						</div>
-					</body>
-				</html>
-				`
+
+			buffer.Reset()
+			buffer.WriteString(`<!DOCTYPE html><html><head><title>Error: `)
+			buffer.WriteString(resp.Status)
+			buffer.WriteString(`</title><style>body{font-family:'Helvetica Neue',sans-serif;color:#333;margin:0;padding:0}.container{display:flex;align-items:center;justify-content:center;height:100vh;background:#fafafa}.error-box{width:600px;padding:20px;background:#fff;border-radius:5px;box-shadow:0 2px 4px rgba(0,0,0,.1)}.error-box h1{font-size:36px;margin-bottom:20px}.error-box p{font-size:16px;line-height:1.5;margin-bottom:20px}.error-box p.description{font-style:italic;color:#666}.error-box a{display:inline-block;padding:10px 20px;background:#00b8d4;color:#fff;border-radius:5px;text-decoration:none;font-size:16px}</style><div class=container><div class=error-box><h1>Error:`)
+			buffer.WriteString(`</h1><p>Sorry, the backend returned this error.</p><iframe width="100%" height="25%" style="border:1px ridge lightgrey; border-radius: 5px;"srcdoc="`)
+			buffer.WriteString(errMsg)
+			buffer.WriteString(`"></iframe><a onclick="location.reload()">Reload page</a></div></div></body></html>`)
+
+		} else {
+
+			buffer.Reset()
+			buffer.WriteString(`<!DOCTYPE html><html><head><title>Error: `)
+			buffer.WriteString(resp.Status)
+			buffer.WriteString(`</title><style>body{font-family:'Helvetica Neue',sans-serif;color:#333;margin:0;padding:0}.container{display:flex;align-items:center;justify-content:center;height:100vh;background:#fafafa}.error-box{width:600px;padding:20px;background:#fff;border-radius:5px;box-shadow:0 2px 4px rgba(0,0,0,.1)}.error-box h1{font-size:36px;margin-bottom:20px}.error-box p{font-size:16px;line-height:1.5;margin-bottom:20px}.error-box p.description{font-style:italic;color:#666}.error-box a{display:inline-block;padding:10px 20px;background:#00b8d4;color:#fff;border-radius:5px;text-decoration:none;font-size:16px}</style><div class=container><div class=error-box><h1>`)
+			buffer.WriteString(resp.Status)
+			buffer.WriteString(`</h1><p>Sorry, the backend returned an error. That's all we know.</p><a onclick="location.reload()">Reload page</a></div></div></body></html>`)
 		}
+
 		resp.Body.Close()
 
 		return &http.Response{
 			StatusCode: http.StatusOK,
-			Body:       io.NopCloser(strings.NewReader(errPage)),
+			Body:       io.NopCloser(bytes.NewReader(buffer.Bytes())),
 		}, nil
 	}
 

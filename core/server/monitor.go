@@ -313,9 +313,9 @@ func commands() {
 			input := scanner.Text()
 			details := strings.Split(input, " ")
 
-			firewall.Mutex.Lock()
+			firewall.Mutex.RLock()
 			domainData := domains.DomainsData[proxy.WatchedDomain]
-			firewall.Mutex.Unlock()
+			firewall.Mutex.RUnlock()
 			helpMode = false
 
 			switch details[0] {
@@ -336,16 +336,16 @@ func commands() {
 					domainData.Stage = 1
 					domainData.StageManuallySet = false
 
-					firewall.Mutex.Lock()
+					firewall.Mutex.RLock()
 					domains.DomainsData[proxy.WatchedDomain] = domainData
-					firewall.Mutex.Unlock()
+					firewall.Mutex.RUnlock()
 				} else {
 					domainData.Stage = stage
 					domainData.StageManuallySet = true
 
-					firewall.Mutex.Lock()
+					firewall.Mutex.RLock()
 					domains.DomainsData[proxy.WatchedDomain] = domainData
-					firewall.Mutex.Unlock()
+					firewall.Mutex.RUnlock()
 				}
 			case "domain":
 				if len(details) < 2 {

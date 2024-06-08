@@ -5,7 +5,7 @@ import (
 )
 
 var (
-	Mutex = &sync.Mutex{}
+	Mutex = &sync.RWMutex{}
 
 	//store unknown fingerprints for ratelimiting
 	UnkFps = map[string]int{}

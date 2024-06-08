@@ -6,7 +6,6 @@ import (
 	"goProxy/core/api"
 	"goProxy/core/domains"
 	"goProxy/core/firewall"
-	"goProxy/core/pnc"
 	"goProxy/core/proxy"
 	"goProxy/core/utils"
 	"image"
@@ -24,13 +23,13 @@ import (
 
 func Middleware(c *fiber.Ctx) error {
 
-	defer pnc.PanicHndl()
+	// defer pnc.PanicHndl() we wont do this during prod, to avoid overhead
 
 	reqHeaders := c.GetReqHeaders()
 	domainName := utils.SafeString(reqHeaders["Host"])
-	firewall.Mutex.Lock()
+	firewall.Mutex.RLock()
 	domainData := domains.DomainsData[domainName]
-	firewall.Mutex.Unlock()
+	firewall.Mutex.RUnlock()
 
 	if domainData.Stage == 0 {
 		c.SendString("balooProxy: " + domainName + " does not exist. If you are the owner please check your config.json if you believe this is a mistake")
@@ -57,20 +56,20 @@ func Middleware(c *fiber.Ctx) error {
 		botFp = ""
 		fpCount = 0
 
-		firewall.Mutex.Lock()
+		firewall.Mutex.RLock()
 		ipCount = firewall.AccessIps[ip]
 		ipCountCookie = firewall.AccessIpsCookie[ip]
-		firewall.Mutex.Unlock()
+		firewall.Mutex.RUnlock()
 	} else {
 		ip = c.IP()
 
 		//Retrieve information about the client
-		firewall.Mutex.Lock()
+		firewall.Mutex.RLock()
 		tlsFp = firewall.Connections[cContext.RemoteAddr().String()]
 		fpCount = firewall.UnkFps[tlsFp]
 		ipCount = firewall.AccessIps[ip]
 		ipCountCookie = firewall.AccessIpsCookie[ip]
-		firewall.Mutex.Unlock()
+		firewall.Mutex.RUnlock()
 
 		//Read-Only IMPORTANT: Must be put in mutex if you add the ability to change indexed fingerprints while program is running
 		browser = firewall.KnownFingerprints[tlsFp]
