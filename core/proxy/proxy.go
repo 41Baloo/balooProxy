@@ -29,6 +29,8 @@ var (
 	JSSecret string
 	JSOTP    string
 
+	JSDifficulty = 5
+
 	CaptchaSecret string
 	CaptchaOTP    string
 

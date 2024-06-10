@@ -168,6 +168,7 @@ func Middleware(c *fiber.Ctx) error {
 
 	//Check if encryption-result is already "cached" to prevent load on reverse proxy
 	encryptedIP := ""
+	hashedEncryptedIP := ""
 	susLvStr := utils.StageToString(susLv)
 	accessKey := ip + tlsFp + reqUa + proxy.CurrHourStr
 	encryptedCache, encryptedExists := firewall.CacheIps.Load(accessKey + susLvStr)
@@ -180,6 +181,8 @@ func Middleware(c *fiber.Ctx) error {
 			encryptedIP = utils.Encrypt(accessKey, proxy.CookieOTP)
 		case 2:
 			encryptedIP = utils.Encrypt(accessKey, proxy.JSOTP)
+			hashedEncryptedIP = utils.EncryptSha(encryptedIP, "")
+			firewall.CacheIps.Store(encryptedIP, hashedEncryptedIP)
 		case 3:
 			encryptedIP = utils.Encrypt(accessKey, proxy.CaptchaOTP)
 		default:
@@ -189,6 +192,10 @@ func Middleware(c *fiber.Ctx) error {
 		firewall.CacheIps.Store(accessKey+susLvStr, encryptedIP)
 	} else {
 		encryptedIP = encryptedCache.(string)
+		cachedHIP, foundCachedHIP := firewall.CacheIps.Load(encryptedIP)
+		if foundCachedHIP {
+			hashedEncryptedIP = cachedHIP.(string)
+		}
 	}
 
 	//Check if client provided correct verification result
@@ -207,9 +214,10 @@ func Middleware(c *fiber.Ctx) error {
 			c.Redirect(cOURL, 302)
 			return nil
 		case 2:
+			publicSalt := encryptedIP[:len(encryptedIP)-domainData.Stage2Difficulty]
 			c.Append("Content-Type", "text/html")
 			c.Append("Cache-Control", "no-store, no-cache, must-revalidate, max-age=0") // Prevent special(ed) browsers from caching the challenge
-			c.SendString(`<script>let hasMemApi=!1,useMem=!1,hasKnownMem=!1,startMem=null,plugCh=!1,mimeCh=!1;function calcSolution(e){let i=0;for(var t=Math.pow(e,7);t>=0;t--)i+=Math.atan(t)*Math.tan(t);return!0}if(void 0!=performance.memory){if(hasMemApi=!0,startMem=performance.memory,161e5==performance.memory.totalJSHeapSize||127e5==performance.memory.usedJSHeapSize||1e7==performance.memory.usedJSHeapSize||219e4==performance.memory.jsHeapSizeLimit)for(hasKnownMem=!0;calcSolution(performance.memory.usedJSHeapSize);)0>performance.now()&&(hasKnownMem=!1);else calcSolution(8)}if(hasMemApi){let e=performance.memory;if(startMem.usedJSHeapSize==e.usedJSHeapSize&&startMem.jsHeapSizeLimit==e.jsHeapSizeLimit&&startMem.totalJSHeapSize==e.totalJSHeapSize)for(useMem=!0;calcSolution(performance.memory.usedJSHeapSize);)0>performance.now()&&(hasKnownMem=!1)}let pluginString=Object.getOwnPropertyDescriptor(Object.getPrototypeOf(navigator),"plugins").get.toString();"function get plugins() { [native code] }"!=pluginString&&"function plugins() {\n        [native code]\n    }"!=pluginString&&"function plugins() {\n    [native code]\n}"!=pluginString&&(plugCh=!0);let mimeString=Object.getOwnPropertyDescriptor(Object.getPrototypeOf(navigator),"plugins").get.toString();"function get plugins() { [native code] }"!=mimeString&&"function plugins() {\n        [native code]\n    }"!=mimeString&&"function plugins() {\n    [native code]\n}"!=mimeString&&(mimeCh=!0),mimeCh||plugCh||useMem||hasKnownMem||(document.cookie="_2__bProxy_v=` + encryptedIP + `; SameSite=Lax; path=/; Secure",location.href=location.href);</script>`)
+			c.SendString(`<!doctypehtml><html lang=en><meta charset=UTF-8><meta content="width=device-width,initial-scale=1"name=viewport><title>Completing challenge ...</title><style>body,html{height:100%;width:100%;margin:0;display:flex;flex-direction:column;justify-content:center;align-items:center;background-color:#f0f0f0;font-family:Arial,sans-serif}.loader{display:flex;justify-content:space-around;align-items:center;width:100px;height:100px}.loader div{width:20px;height:20px;background-color:#333;border-radius:50%;animation:bounce .6s infinite alternate}.loader div:nth-child(2){animation-delay:.2s}.loader div:nth-child(3){animation-delay:.4s}@keyframes bounce{to{transform:translateY(-30px)}}.message{text-align:center;margin-top:20px;color:#333}.subtext{text-align:center;color:#666;font-size:.9em;margin-top:5px}.placeholder-container{width:25%;text-align:center;margin:10px 0}.placeholder-label{font-weight:700;margin-bottom:5px}.placeholder{background-color:#e0e0e0;padding:10px;border-radius:5px;word-break:break-all;font-family:monospace;cursor:pointer;}</style><div class=loader><div></div><div></div><div></div></div><div class=message><p>Completing challenge ...<div class=subtext>The process is automatic and shouldn't take too long. Please be patient.</div></div><div class=placeholder-container><div class=placeholder-label>publicSalt:</div><div class=placeholder id=publicSalt onclick='ctc("publicSalt")'><span>` + publicSalt + `</span></div></div><div class=placeholder-container><div class=placeholder-label>challenge:</div><div class=placeholder id=challenge onclick='ctc("challenge")'><span>` + hashedEncryptedIP + `</span></div></div><script>function ctc(t){navigator.clipboard.writeText(document.getElementById(t).innerText)}</script><script src="https://cdn.jsdelivr.net/gh/41Baloo/balooPow@main/balooPow.min.js"></script><script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.0.0/crypto-js.min.js"></script><script>let hasMemoryApi=!1,useMemory=!1,hasKnownMemory=!1,startMemory=null,pluginChanged=!1,mimeChanged=!1;function calcSolution(e){let n=0;for(let o=Math.pow(e,7);o>=0;o--)n+=Math.atan(o)*Math.tan(o);return!0}if(void 0!==performance.memory){hasMemoryApi=!0,startMemory=performance.memory;let{totalJSHeapSize:e,usedJSHeapSize:n,jsHeapSizeLimit:o}=performance.memory;if(161e5===e||127e5===n||1e7===n||219e4===o)for(hasKnownMemory=!0;calcSolution(n);)0>performance.now()&&(hasKnownMemory=!1)}if(hasMemoryApi){let t=performance.memory,{usedJSHeapSize:i,jsHeapSizeLimit:r,totalJSHeapSize:g}=startMemory;if(i===t.usedJSHeapSize&&r===t.jsHeapSizeLimit&&g===t.totalJSHeapSize)for(useMemory=!0;calcSolution(t.usedJSHeapSize);)0>performance.now()&&(hasKnownMemory=!1)}let pluginString=Object.getOwnPropertyDescriptor(Object.getPrototypeOf(navigator),"plugins").get.toString();const pluginStringsToCheck=["function get plugins() { [native code] }","function plugins() {\n        [native code]\n    }","function plugins() {\n    [native code]\n}"];pluginStringsToCheck.includes(pluginString)||(pluginChanged=!0);let mimeString=Object.getOwnPropertyDescriptor(Object.getPrototypeOf(navigator),"plugins").get.toString();if(pluginStringsToCheck.includes(mimeString)||(mimeChanged=!0),!mimeChanged&&!pluginChanged&&!useMemory&&!hasKnownMemory){let a=new BalooPow("` + publicSalt + `", ` + strconv.Itoa(domainData.Stage2Difficulty) + `,"` + hashedEncryptedIP + `",!1);a.Solve().then(e=>{document.cookie="_2__bProxy_v=` + publicSalt + `"+e.solution+"; SameSite=Lax; path=/; Secure",location.href=location.href})}</script>`)
 			return nil
 		case 3:
 			secretPart := encryptedIP[:6]

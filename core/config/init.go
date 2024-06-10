@@ -98,6 +98,9 @@ func Load() {
 	}
 
 	if domains.Config.Proxy.RatelimitWindow != 0 {
+		if domains.Config.Proxy.RatelimitWindow < 10 {
+			domains.Config.Proxy.RatelimitWindow = 10
+		}
 		proxy.RatelimitWindow = domains.Config.Proxy.RatelimitWindow
 	}
 
@@ -175,10 +178,16 @@ func Load() {
 		})
 
 		firewall.Mutex.Lock()
+
+		if domain.Stage2Difficulty == 0 {
+			domain.Stage2Difficulty = 5
+		}
+
 		domains.DomainsData[domain.Name] = domains.DomainData{
 			Name:             domain.Name,
 			Stage:            1,
 			StageManuallySet: false,
+			Stage2Difficulty: domain.Stage2Difficulty,
 			RawAttack:        false,
 			BypassAttack:     false,
 			LastLogs:         []string{},

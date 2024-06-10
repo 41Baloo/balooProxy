@@ -32,6 +32,7 @@ type Domain struct {
 	FirewallRules       []JsonRule      `json:"firewallRules"`
 	BypassStage1        int             `json:"bypassStage1"`
 	BypassStage2        int             `json:"bypassStage2"`
+	Stage2Difficulty    int             `json:"stage2Difficulty"`
 	DisableBypassStage3 int             `json:"disableBypassStage3"`
 	DisableRawStage3    int             `json:"disableRawStage3"`
 	DisableBypassStage2 int             `json:"disableBypassStage2"`
@@ -61,6 +62,7 @@ type DomainData struct {
 	Name             string
 	Stage            int
 	StageManuallySet bool
+	Stage2Difficulty int
 	RawAttack        bool
 	BypassAttack     bool
 	BufferCooldown   int

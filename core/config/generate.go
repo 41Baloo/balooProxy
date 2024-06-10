@@ -19,7 +19,7 @@ func Generate() {
 
 	gConfig := domains.Configuration{
 		Proxy: domains.Proxy{
-			LowRam: utils.AskBool("Use Less RAM But More CPU? (y/N)", false),
+			LowRam:      utils.AskBool("Use Less RAM But More CPU? (y/N)", false),
 			Cloudflare:  utils.AskBool("Use This Proxy With Cloudflare? (y/N)", false),
 			Network:     "tcp",
 			AdminSecret: utils.RandomString(25),
@@ -80,6 +80,7 @@ func AddDomain() {
 		},
 		FirewallRules:       []domains.JsonRule{},
 		BypassStage1:        utils.AskInt("At How Many Bypassing Requests Per Second Would You Like To Activate Stage 2?", 75),
+		Stage2Difficulty:    utils.AskInt("How difficult should Stage 2 Be? (6 AT MOST recommended)", 5),
 		BypassStage2:        utils.AskInt("At How Many Bypassing Requests Per Second Would You Like To Activate Stage 3?", 250),
 		DisableBypassStage3: utils.AskInt("How Many Bypassing Requests Per Second Are Low Enough To Disable Stage 3?", 100),
 		DisableRawStage3:    utils.AskInt("How Many Requests Per Second Are Low Enough To Disable Stage 3? (Bypassing Requests Still Have To Be Low Enough)", 250),
