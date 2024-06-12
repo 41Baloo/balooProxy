@@ -14,6 +14,7 @@ func Get(domain string) (DomainSettings, error) {
 }
 
 func GetCertificate(clientHello *tls.ClientHelloInfo) (*tls.Certificate, error) {
+
 	domainVal, ok := DomainsMap.Load(clientHello.ServerName)
 	if ok {
 		tempDomain := domainVal.(DomainSettings)

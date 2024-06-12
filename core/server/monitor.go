@@ -14,6 +14,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/gofiber/fiber/v2/middleware/adaptor"
 	"github.com/inancgumus/screen"
 	"github.com/kor44/gofilter"
 	"github.com/shirou/gopsutil/cpu"
@@ -40,21 +41,28 @@ func Monitor() {
 	screen.MoveTopLeft()
 	PrintMutex.Unlock()
 
+	proxy.LastSecondTime = time.Now()
+	proxy.LastSecondTimeFormated = proxy.LastSecondTime.Format("15:04:05")
+	proxy.LastSecondTimestamp = int(proxy.LastSecondTime.Unix())
+	proxy.Last10SecondTimestamp = utils.TrimTime(proxy.LastSecondTimestamp)
+	proxy.CurrHour, _, _ = proxy.LastSecondTime.Clock()
+	proxy.CurrHourStr = strconv.Itoa(proxy.CurrHour)
+
 	//Responsible for handeling user-commands
 	go commands()
 
 	//Responsible for clearing outdated cache and data
 	go clearProxyCache()
 
-	//Responsible for clearing outdated websitecache
-	go clearOutdatedCache()
-
 	//Responsible for generating non-bruteforable secrets
 	go generateOTPSecrets()
 
+	//Responsible for keeping track of ratelimit
+	go evaluateRatelimit()
+
 	PrintMutex.Lock()
 	fmt.Println("\033[" + fmt.Sprint(11+proxy.MaxLogLength) + ";1H")
-	fmt.Print("[ " + utils.RedText("Command") + " ]: \033[s")
+	fmt.Print("[ " + utils.PrimaryColor("Command") + " ]: \033[s")
 	PrintMutex.Unlock()
 	for {
 		PrintMutex.Lock()
@@ -73,7 +81,7 @@ func Monitor() {
 			screen.Clear()
 			screen.MoveTopLeft()
 			fmt.Println("\033[" + fmt.Sprint(12+proxy.MaxLogLength) + ";1H")
-			fmt.Print("[ " + utils.RedText("Command") + " ]: \033[s")
+			fmt.Print("[ " + utils.PrimaryColor("Command") + " ]: \033[s")
 		}
 		utils.ClearScreen(proxy.MaxLogLength)
 		fmt.Print("\033[1;1H")
@@ -94,15 +102,20 @@ func Monitor() {
 // Only run this inside of a locked thread to avoid false reports
 func checkAttack(domainName string, domainData domains.DomainData) {
 
+	if domainName == "debug" {
+		return
+	}
+
 	domainData.RequestsPerSecond = domainData.TotalRequests - domainData.PrevRequests
 	domainData.RequestsBypassedPerSecond = domainData.BypassedRequests - domainData.PrevBypassed
 
 	domainData.PrevRequests = domainData.TotalRequests
 	domainData.PrevBypassed = domainData.BypassedRequests
 
-	if !domainData.StageManuallySet || domainData.BypassAttack {
+	if !domainData.StageManuallySet || (domainData.BufferCooldown > 0) {
 
-		if domainData.BypassAttack {
+		// Log requests if a bypassing or raw attack is ongoing
+		if domainData.BufferCooldown > 0 {
 			if domainData.RequestsPerSecond > domainData.PeakRequestsPerSecond {
 				domainData.PeakRequestsPerSecond = domainData.RequestsPerSecond
 			}
@@ -120,30 +133,82 @@ func checkAttack(domainName string, domainData domains.DomainData) {
 		settingQuery, _ := domains.DomainsMap.Load(domainName)
 		domainSettings := settingQuery.(domains.DomainSettings)
 
-		if domainData.Stage == 1 && domainData.RequestsBypassedPerSecond > domainSettings.BypassStage1 && !domainData.BypassAttack {
-			domainData.BypassAttack = true
-			domainData.Stage = 2
-			domainData.PeakRequestsPerSecond = domainData.RequestsPerSecond
-			domainData.PeakRequestsBypassedPerSecond = domainData.RequestsBypassedPerSecond
-			domainData.RequestLogger = append(domainData.RequestLogger, domains.RequestLog{
-				Time:     time.Now(),
-				Allowed:  domainData.RequestsBypassedPerSecond,
-				Total:    domainData.RequestsPerSecond,
-				CpuUsage: proxy.CpuUsage,
-			})
-			go utils.SendWebhook(domainData, domainSettings, int(0))
-		} else if domainData.Stage == 2 && domainData.RequestsBypassedPerSecond > domainSettings.BypassStage2 {
-			domainData.Stage = 3
-		} else if domainData.Stage == 3 && domainData.RequestsBypassedPerSecond < domainSettings.DisableBypassStage3 && domainData.RequestsPerSecond < domainSettings.DisableRawStage3 {
-			domainData.Stage = 2
-		} else if domainData.Stage == 2 && domainData.RequestsBypassedPerSecond < domainSettings.DisableBypassStage2 && domainData.RequestsPerSecond < domainSettings.DisableRawStage2 && domainData.BypassAttack {
-			domainData.BypassAttack = false
-			domainData.Stage = 1
-			go utils.SendWebhook(domainData, domainSettings, int(1))
-			domainData.PeakRequestsPerSecond = 0
-			domainData.PeakRequestsBypassedPerSecond = 0
-			domainData.RequestLogger = []domains.RequestLog{}
+		if !domainData.BypassAttack && !domainData.RawAttack && (domainData.BufferCooldown > 0) {
+			domainData.BufferCooldown--
+
+			if domainData.BufferCooldown == 0 {
+				utils.AddLogs("Attack Ending Webhook Sent", "debug")
+				go utils.SendWebhook(domainData, domainSettings, int(1))
+				domainData.PeakRequestsPerSecond = 0
+				domainData.PeakRequestsBypassedPerSecond = 0
+				domainData.RequestLogger = []domains.RequestLog{}
+			}
 		}
+
+		switch domainData.Stage {
+		case 1:
+			// A Bypassing Attack Started
+			if domainData.RequestsBypassedPerSecond > domainSettings.BypassStage1 && !domainData.BypassAttack {
+				utils.AddLogs("Bypassing Attack Started", "debug")
+				domainData.BypassAttack = true
+				domainData.Stage = 2
+				if domainData.BufferCooldown == 0 {
+					domainData.PeakRequestsPerSecond = domainData.RequestsPerSecond
+					domainData.PeakRequestsBypassedPerSecond = domainData.RequestsBypassedPerSecond
+					domainData.RequestLogger = append(domainData.RequestLogger, domains.RequestLog{
+						Time:     time.Now(),
+						Allowed:  domainData.RequestsBypassedPerSecond,
+						Total:    domainData.RequestsPerSecond,
+						CpuUsage: proxy.CpuUsage,
+					})
+					go utils.SendWebhook(domainData, domainSettings, int(0))
+				}
+				// Start/Set cooldown
+				domainData.BufferCooldown = 10
+			}
+		case 2:
+			// Stage 2 is getting bypassed
+			if domainData.RequestsBypassedPerSecond > domainSettings.BypassStage2 {
+				domainData.Stage = 3
+
+				// Stage 2 is no longer getting bypassed
+			} else if domainData.RequestsBypassedPerSecond < domainSettings.DisableBypassStage2 && domainData.RequestsPerSecond < domainSettings.DisableRawStage2 && domainData.BypassAttack {
+				utils.AddLogs("Bypassing Attack Ended", "debug")
+				domainData.BypassAttack = false
+				domainData.RawAttack = false
+				domainData.Stage = 1
+			}
+		case 3:
+			// Stage 3 is no longer getting bypassed
+			if domainData.RequestsBypassedPerSecond < domainSettings.DisableBypassStage3 && domainData.RequestsPerSecond < domainSettings.DisableRawStage3 {
+				domainData.Stage = 2
+			}
+		}
+
+		// An attack that didnt bypass was started
+		if domainData.RequestsPerSecond > domainSettings.DisableRawStage2 && !domainData.RawAttack && !domainData.BypassAttack {
+			utils.AddLogs("Raw Attack Started", "debug")
+			domainData.RawAttack = true
+
+			if domainData.BufferCooldown == 0 {
+				domainData.PeakRequestsPerSecond = domainData.RequestsPerSecond
+				domainData.PeakRequestsBypassedPerSecond = domainData.RequestsBypassedPerSecond
+				domainData.RequestLogger = append(domainData.RequestLogger, domains.RequestLog{
+					Time:     time.Now(),
+					Allowed:  domainData.RequestsBypassedPerSecond,
+					Total:    domainData.RequestsPerSecond,
+					CpuUsage: proxy.CpuUsage,
+				})
+				go utils.SendWebhook(domainData, domainSettings, int(0))
+			}
+
+			//Set/Start cooldown
+			domainData.BufferCooldown = 10
+		} else if domainData.RequestsPerSecond < domainSettings.DisableRawStage2 && domainData.RawAttack && !domainData.BypassAttack {
+			utils.AddLogs("Raw Attack Ended", "debug")
+			domainData.RawAttack = false
+		}
+
 	}
 
 	domains.DomainsData[domainName] = domainData
@@ -152,18 +217,22 @@ func checkAttack(domainName string, domainData domains.DomainData) {
 func printStats() {
 
 	proxy.LastSecondTime = time.Now()
+	proxy.LastSecondTimeFormated = proxy.LastSecondTime.Format("15:04:05")
+	proxy.LastSecondTimestamp = int(proxy.LastSecondTime.Unix())
+	proxy.Last10SecondTimestamp = utils.TrimTime(proxy.LastSecondTimestamp)
 	proxy.CurrHour, _, _ = proxy.LastSecondTime.Clock()
+	proxy.CurrHourStr = strconv.Itoa(proxy.CurrHour)
 
 	result, err := cpu.Percent(0, false)
 	if err != nil {
 		proxy.CpuUsage = "ERR"
-		fmt.Println("[" + utils.RedText("+") + "] [ " + utils.RedText("Cpu Usage") + " ] > [ " + utils.RedText(err.Error()) + " ]")
+		fmt.Println("[" + utils.PrimaryColor("+") + "] [ " + utils.PrimaryColor("Cpu Usage") + " ] > [ " + utils.PrimaryColor(err.Error()) + " ]")
 	} else if len(result) > 0 {
 		proxy.CpuUsage = fmt.Sprintf("%.2f", result[0])
-		fmt.Println("[" + utils.RedText("+") + "] [ " + utils.RedText("Cpu Usage") + " ] > [ " + utils.RedText(proxy.CpuUsage) + " ]")
+		fmt.Println("[" + utils.PrimaryColor("+") + "] [ " + utils.PrimaryColor("Cpu Usage") + " ] > [ " + utils.PrimaryColor(proxy.CpuUsage) + " ]")
 	} else {
 		proxy.CpuUsage = "ERR_S0"
-		fmt.Println("[" + utils.RedText("+") + "] [ " + utils.RedText("Cpu Usage") + " ] > [ " + utils.RedText("100.00 ( Speculated )") + " ]")
+		fmt.Println("[" + utils.PrimaryColor("+") + "] [ " + utils.PrimaryColor("Cpu Usage") + " ] > [ " + utils.PrimaryColor("100.00 ( Speculated )") + " ]")
 	}
 
 	//Not printed yet but calculated ram usage in %
@@ -182,46 +251,46 @@ func printStats() {
 
 	if domainData.Stage == 0 && proxy.WatchedDomain != "debug" {
 		if proxy.WatchedDomain != "" {
-			fmt.Println("[" + utils.RedText("!") + "] [ " + utils.RedText("Domain \""+proxy.WatchedDomain+"\" Not Found") + " ]")
+			fmt.Println("[" + utils.PrimaryColor("!") + "] [ " + utils.PrimaryColor("Domain \""+proxy.WatchedDomain+"\" Not Found") + " ]")
 			fmt.Println("")
 		}
-		fmt.Println("[" + utils.RedText("Available Domains") + "]")
+		fmt.Println("[" + utils.PrimaryColor("Available Domains") + "]")
 		counter := 0
 		for _, dName := range domains.Domains {
 			if counter < proxy.MaxLogLength {
-				fmt.Println("[" + utils.RedText("+") + "] [ " + utils.RedText(dName) + " ]")
+				fmt.Println("[" + utils.PrimaryColor("+") + "] [ " + utils.PrimaryColor(dName) + " ]")
 				counter++
 			}
 		}
 	} else if helpMode {
-		fmt.Println("[" + utils.RedText("Available Commands") + "]")
+		fmt.Println("[" + utils.PrimaryColor("Available Commands") + "]")
 		fmt.Println("")
-		fmt.Println("[" + utils.RedText("+") + "] [ " + utils.RedText("help") + " ]: " + utils.RedText("Displays all available commands. More detailed information can be found at ") + "https://github.com/41Baloo/balooProxy#commands")
-		fmt.Println("[" + utils.RedText("+") + "] [ " + utils.RedText("stage") + " ]: " + utils.RedText("Usage: ") + "stage [number] " + utils.RedText("Locks the stage to the specified number. Use ") + "stage 0 " + utils.RedText("to unlock the stage"))
-		fmt.Println("[" + utils.RedText("+") + "] [ " + utils.RedText("domain") + " ]: " + utils.RedText("Usage: ") + "domain [name] " + utils.RedText("Switch between your domains. Type only ") + "domain " + utils.RedText("to list all available domains"))
-		fmt.Println("[" + utils.RedText("+") + "] [ " + utils.RedText("add") + " ]: " + utils.RedText("Usage: ") + "add " + utils.RedText("Starts a dialouge to add another domain to the proxy"))
-		fmt.Println("[" + utils.RedText("+") + "] [ " + utils.RedText("rtlogs") + " ]: " + utils.RedText("Usage: ") + "rtlogs " + utils.RedText("Toggels 'Real-Time-Logs' on and off. It is suggested to keep off"))
-		fmt.Println("[" + utils.RedText("+") + "] [ " + utils.RedText("clrlogs") + " ]: " + utils.RedText("Usage: ") + "clrlogs " + utils.RedText("Clears all logs for the current domain"))
-		fmt.Println("[" + utils.RedText("+") + "] [ " + utils.RedText("cachemode") + " ]: " + utils.RedText("Usage: ") + "cachemode " + utils.RedText("Toggels whether or not the proxy tries to cache on and off"))
-		fmt.Println("[" + utils.RedText("+") + "] [ " + utils.RedText("delcache") + " ]: " + utils.RedText("Usage: ") + "delcache " + utils.RedText("Clears the cache for the current domain"))
-		fmt.Println("[" + utils.RedText("+") + "] [ " + utils.RedText("reload") + " ]: " + utils.RedText("Usage: ") + "reload " + utils.RedText("Reload your proxy in order for changes in your ") + "config.json " + utils.RedText("to take effect"))
+		fmt.Println("[" + utils.PrimaryColor("+") + "] [ " + utils.PrimaryColor("help") + " ]: " + utils.PrimaryColor("Displays all available commands. More detailed information can be found at ") + "https://github.com/41Baloo/balooProxy#commands")
+		fmt.Println("[" + utils.PrimaryColor("+") + "] [ " + utils.PrimaryColor("stage") + " ]: " + utils.PrimaryColor("Usage: ") + "stage [number] " + utils.PrimaryColor("Locks the stage to the specified number. Use ") + "stage 0 " + utils.PrimaryColor("to unlock the stage"))
+		fmt.Println("[" + utils.PrimaryColor("+") + "] [ " + utils.PrimaryColor("domain") + " ]: " + utils.PrimaryColor("Usage: ") + "domain [name] " + utils.PrimaryColor("Switch between your domains. Type only ") + "domain " + utils.PrimaryColor("to list all available domains"))
+		fmt.Println("[" + utils.PrimaryColor("+") + "] [ " + utils.PrimaryColor("add") + " ]: " + utils.PrimaryColor("Usage: ") + "add " + utils.PrimaryColor("Starts a dialouge to add another domain to the proxy"))
+		fmt.Println("[" + utils.PrimaryColor("+") + "] [ " + utils.PrimaryColor("rtlogs") + " ]: " + utils.PrimaryColor("Usage: ") + "rtlogs " + utils.PrimaryColor("Toggels 'Real-Time-Logs' on and off. It is suggested to keep off"))
+		fmt.Println("[" + utils.PrimaryColor("+") + "] [ " + utils.PrimaryColor("clrlogs") + " ]: " + utils.PrimaryColor("Usage: ") + "clrlogs " + utils.PrimaryColor("Clears all logs for the current domain"))
+		fmt.Println("[" + utils.PrimaryColor("+") + "] [ " + utils.PrimaryColor("cachemode") + " ]: " + utils.PrimaryColor("Usage: ") + "cachemode " + utils.PrimaryColor("Toggels whether or not the proxy tries to cache on and off"))
+		fmt.Println("[" + utils.PrimaryColor("+") + "] [ " + utils.PrimaryColor("delcache") + " ]: " + utils.PrimaryColor("Usage: ") + "delcache " + utils.PrimaryColor("Clears the cache for the current domain"))
+		fmt.Println("[" + utils.PrimaryColor("+") + "] [ " + utils.PrimaryColor("reload") + " ]: " + utils.PrimaryColor("Usage: ") + "reload " + utils.PrimaryColor("Reload your proxy in order for changes in your ") + "config.json " + utils.PrimaryColor("to take effect"))
 	} else {
 
-		fmt.Println("[" + utils.RedText("+") + "] [ " + utils.RedText("Domain") + " ] > [ " + utils.RedText(proxy.WatchedDomain) + " ]")
-		fmt.Println("[" + utils.RedText("+") + "] [ " + utils.RedText("Stage") + " ] > [ " + utils.RedText(fmt.Sprint(domainData.Stage)) + " ]")
-		fmt.Println("[" + utils.RedText("+") + "] [ " + utils.RedText("Stage Locked") + " ] > [ " + utils.RedText(fmt.Sprint(domainData.StageManuallySet)) + " ]")
+		fmt.Println("[" + utils.PrimaryColor("+") + "] [ " + utils.PrimaryColor("Domain") + " ] > [ " + utils.PrimaryColor(proxy.WatchedDomain) + " ]")
+		fmt.Println("[" + utils.PrimaryColor("+") + "] [ " + utils.PrimaryColor("Stage") + " ] > [ " + utils.PrimaryColor(fmt.Sprint(domainData.Stage)) + " ]")
+		fmt.Println("[" + utils.PrimaryColor("+") + "] [ " + utils.PrimaryColor("Stage Locked") + " ] > [ " + utils.PrimaryColor(fmt.Sprint(domainData.StageManuallySet)) + " ]")
 		fmt.Println("")
-		fmt.Println("[" + utils.RedText("+") + "] [ " + utils.RedText("Total") + " ] > [ " + utils.RedText(fmt.Sprint(domainData.RequestsPerSecond)+" r/s") + " ]")
-		fmt.Println("[" + utils.RedText("+") + "] [ " + utils.RedText("Bypassed") + " ] > [ " + utils.RedText(fmt.Sprint(domainData.RequestsBypassedPerSecond)+" r/s") + " ]")
+		fmt.Println("[" + utils.PrimaryColor("+") + "] [ " + utils.PrimaryColor("Total") + " ] > [ " + utils.PrimaryColor(fmt.Sprint(domainData.RequestsPerSecond)+" r/s") + " ]")
+		fmt.Println("[" + utils.PrimaryColor("+") + "] [ " + utils.PrimaryColor("Bypassed") + " ] > [ " + utils.PrimaryColor(fmt.Sprint(domainData.RequestsBypassedPerSecond)+" r/s") + " ]")
 
 		fmt.Println("")
-		fmt.Println("[ " + utils.RedText("Latest Logs") + " ]")
+		fmt.Println("[ " + utils.PrimaryColor("Latest Logs") + " ]")
 
 		for _, log := range domainData.LastLogs {
 			if len(log)+4 > proxy.TWidth {
-				fmt.Println("[" + utils.RedText("+") + "] " + log[:len(log)-(len(log)+4-proxy.TWidth)] + " ...\033[0m")
+				fmt.Println("[" + utils.PrimaryColor("+") + "] " + log[:len(log)-(len(log)+4-proxy.TWidth)] + " ...\033[0m")
 			} else {
-				fmt.Println("[" + utils.RedText("+") + "] " + log)
+				fmt.Println("[" + utils.PrimaryColor("+") + "] " + log)
 			}
 		}
 	}
@@ -239,14 +308,14 @@ func commands() {
 
 			PrintMutex.Lock()
 			fmt.Println("\033[" + fmt.Sprint(12+proxy.MaxLogLength) + ";1H")
-			fmt.Print("\033[K[ " + utils.RedText("Command") + " ]: \033[s")
+			fmt.Print("\033[K[ " + utils.PrimaryColor("Command") + " ]: \033[s")
 
 			input := scanner.Text()
 			details := strings.Split(input, " ")
 
-			firewall.Mutex.Lock()
+			firewall.Mutex.RLock()
 			domainData := domains.DomainsData[proxy.WatchedDomain]
-			firewall.Mutex.Unlock()
+			firewall.Mutex.RUnlock()
 			helpMode = false
 
 			switch details[0] {
@@ -267,16 +336,16 @@ func commands() {
 					domainData.Stage = 1
 					domainData.StageManuallySet = false
 
-					firewall.Mutex.Lock()
+					firewall.Mutex.RLock()
 					domains.DomainsData[proxy.WatchedDomain] = domainData
-					firewall.Mutex.Unlock()
+					firewall.Mutex.RUnlock()
 				} else {
 					domainData.Stage = stage
 					domainData.StageManuallySet = true
 
-					firewall.Mutex.Lock()
+					firewall.Mutex.RLock()
 					domains.DomainsData[proxy.WatchedDomain] = domainData
-					firewall.Mutex.Unlock()
+					firewall.Mutex.RUnlock()
 				}
 			case "domain":
 				if len(details) < 2 {
@@ -287,31 +356,31 @@ func commands() {
 
 				screen.Clear()
 				screen.MoveTopLeft()
-				fmt.Println("[ " + utils.RedText("Loading") + " ] ...")
+				fmt.Println("[ " + utils.PrimaryColor("Loading") + " ] ...")
 				fmt.Println("\033[" + fmt.Sprint(12+proxy.MaxLogLength) + ";1H")
-				fmt.Print("[ " + utils.RedText("Command") + " ]: \033[s")
+				fmt.Print("[ " + utils.PrimaryColor("Command") + " ]: \033[s")
 			case "add":
 				screen.Clear()
 				screen.MoveTopLeft()
 				utils.AddDomain()
 				screen.Clear()
 				screen.MoveTopLeft()
-				fmt.Println("[ " + utils.RedText("Loading") + " ] ...")
+				fmt.Println("[ " + utils.PrimaryColor("Loading") + " ] ...")
 				fmt.Println("\033[" + fmt.Sprint(12+proxy.MaxLogLength) + ";1H")
-				fmt.Print("[ " + utils.RedText("Command") + " ]: \033[s")
+				fmt.Print("[ " + utils.PrimaryColor("Command") + " ]: \033[s")
 				reloadConfig()
 			case "rtlogs":
 				screen.Clear()
 				screen.MoveTopLeft()
 				if proxy.RealTimeLogs {
 					proxy.RealTimeLogs = false
-					fmt.Println("[ " + utils.RedText("Turning Real Time Logs Off") + " ] ...")
+					fmt.Println("[ " + utils.PrimaryColor("Turning Real Time Logs Off") + " ] ...")
 				} else {
 					proxy.RealTimeLogs = true
-					fmt.Println("[ " + utils.RedText("Turning Real Time Logs On") + " ] ...")
+					fmt.Println("[ " + utils.PrimaryColor("Turning Real Time Logs On") + " ] ...")
 				}
 				fmt.Println("\033[" + fmt.Sprint(12+proxy.MaxLogLength) + ";1H")
-				fmt.Print("[ " + utils.RedText("Command") + " ]: \033[s")
+				fmt.Print("[ " + utils.PrimaryColor("Command") + " ]: \033[s")
 			case "clrlogs":
 				screen.Clear()
 				screen.MoveTopLeft()
@@ -321,53 +390,34 @@ func commands() {
 						utils.ClearLogs(domain)
 						firewall.Mutex.Unlock()
 					}
-					fmt.Println("[ " + utils.RedText("Clearing Logs All Domains ") + " ] ...")
+					fmt.Println("[ " + utils.PrimaryColor("Clearing Logs All Domains ") + " ] ...")
 				} else {
 					firewall.Mutex.Lock()
 					utils.ClearLogs(proxy.WatchedDomain)
 					firewall.Mutex.Unlock()
-					fmt.Println("[ " + utils.RedText("Clearing Logs For "+proxy.WatchedDomain) + " ] ...")
+					fmt.Println("[ " + utils.PrimaryColor("Clearing Logs For "+proxy.WatchedDomain) + " ] ...")
 				}
 				fmt.Println("\033[" + fmt.Sprint(12+proxy.MaxLogLength) + ";1H")
-				fmt.Print("[ " + utils.RedText("Command") + " ]: \033[s")
-			case "delcache":
-				screen.Clear()
-				screen.MoveTopLeft()
-				fmt.Println("[ " + utils.RedText("Clearing Cache For "+proxy.WatchedDomain) + " ] ...")
-				clearCache()
-				fmt.Println("\033[" + fmt.Sprint(12+proxy.MaxLogLength) + ";1H")
-				fmt.Print("[ " + utils.RedText("Command") + " ]: \033[s")
+				fmt.Print("[ " + utils.PrimaryColor("Command") + " ]: \033[s")
 			case "reload":
 				screen.Clear()
 				screen.MoveTopLeft()
-				fmt.Println("[ " + utils.RedText("Reloading Proxy") + " ] ...")
+				fmt.Println("[ " + utils.PrimaryColor("Reloading Proxy") + " ] ...")
 				reloadConfig()
 				fmt.Println("\033[" + fmt.Sprint(12+proxy.MaxLogLength) + ";1H")
-				fmt.Print("[ " + utils.RedText("Command") + " ]: \033[s")
+				fmt.Print("[ " + utils.PrimaryColor("Command") + " ]: \033[s")
 			case "help":
 				helpMode = true
 				screen.Clear()
 				screen.MoveTopLeft()
-				fmt.Println("[ " + utils.RedText("Loading") + " ] ...")
+				fmt.Println("[ " + utils.PrimaryColor("Loading") + " ] ...")
 				fmt.Println("\033[" + fmt.Sprint(12+proxy.MaxLogLength) + ";1H")
-				fmt.Print("[ " + utils.RedText("Command") + " ]: \033[s")
-			case "cachemode":
-				screen.Clear()
-				screen.MoveTopLeft()
-				if proxy.CacheEnabled {
-					proxy.CacheEnabled = false
-					fmt.Println("[ " + utils.RedText("Turning Caching Off") + " ] ...")
-				} else {
-					proxy.CacheEnabled = true
-					fmt.Println("[ " + utils.RedText("Turning Caching On") + " ] ...")
-				}
-				fmt.Println("\033[" + fmt.Sprint(12+proxy.MaxLogLength) + ";1H")
-				fmt.Print("[ " + utils.RedText("Command") + " ]: \033[s")
+				fmt.Print("[ " + utils.PrimaryColor("Command") + " ]: \033[s")
 			default:
 				screen.Clear()
 				screen.MoveTopLeft()
 				fmt.Println("\033[" + fmt.Sprint(12+proxy.MaxLogLength) + ";1H")
-				fmt.Print("[ " + utils.RedText("Command") + " ]: \033[s")
+				fmt.Print("[ " + utils.PrimaryColor("Command") + " ]: \033[s")
 			}
 			PrintMutex.Unlock()
 		}
@@ -414,6 +464,10 @@ func reloadConfig() {
 		proxy.WriteTimeoutDuration = time.Duration(proxy.WriteTimeout).Abs() * time.Second
 	}
 
+	if len(domains.Config.Proxy.Colors) != 0 {
+		utils.SetColor(domains.Config.Proxy.Colors)
+	}
+
 	proxy.IPRatelimit = domains.Config.Proxy.Ratelimits["requests"]
 	proxy.FPRatelimit = domains.Config.Proxy.Ratelimits["unknownFingerprint"]
 	proxy.FailChallengeRatelimit = domains.Config.Proxy.Ratelimits["challengeFailures"]
@@ -432,27 +486,12 @@ func reloadConfig() {
 			}
 			rule, err := gofilter.NewFilter(fwRule.Expression)
 			if err != nil {
-				panic("[ " + utils.RedText("!") + " ] [ Error Loading Custom Firewall Rules: " + utils.RedText(err.Error()) + " ]")
+				panic("[ " + utils.PrimaryColor("!") + " ] [ Error Loading Custom Firewall Rules: " + utils.PrimaryColor(err.Error()) + " ]")
 			}
 
 			firewallRules = append(firewallRules, domains.Rule{
 				Filter: rule,
 				Action: fwRule.Action,
-			})
-		}
-
-		cacheRules := []domains.Rule{}
-		rawCacheRules := domains.Config.Domains[i].CacheRules
-		for _, caRule := range domains.Config.Domains[i].CacheRules {
-
-			rule, err := gofilter.NewFilter(caRule.Expression)
-			if err != nil {
-				panic("[ " + utils.RedText("!") + " ] [ Error Loading Custom Cache Rules: " + utils.RedText(err.Error()) + " ]")
-			}
-
-			cacheRules = append(cacheRules, domains.Rule{
-				Filter: rule,
-				Action: caRule.Action,
 			})
 		}
 
@@ -462,12 +501,14 @@ func reloadConfig() {
 		})
 		dProxy.Transport = &RoundTripper{}
 
+		dProxyHandler := adaptor.HTTPHandler(dProxy)
+
 		var cert tls.Certificate = tls.Certificate{}
 		if !proxy.Cloudflare {
 			var certErr error
 			cert, certErr = tls.LoadX509KeyPair(domain.Certificate, domain.Key)
 			if certErr != nil {
-				panic("[ " + utils.RedText("!") + " ] [ " + utils.RedText("Error Loading Certificates: "+certErr.Error()) + " ]")
+				panic("[ " + utils.PrimaryColor("!") + " ] [ " + utils.PrimaryColor("Error Loading Certificates: "+certErr.Error()) + " ]")
 			}
 		}
 
@@ -478,10 +519,7 @@ func reloadConfig() {
 			IPInfo:         ipInfo,
 			RawCustomRules: rawFirewallRules,
 
-			CacheRules:    cacheRules,
-			RawCacheRules: rawCacheRules,
-
-			DomainProxy:        dProxy,
+			DomainProxy:        dProxyHandler,
 			DomainCertificates: cert,
 			DomainWebhooks: domains.WebhookSettings{
 				URL:            domain.Webhook.URL,
@@ -501,6 +539,7 @@ func reloadConfig() {
 
 		firewall.Mutex.Lock()
 		domains.DomainsData[domain.Name] = domains.DomainData{
+			Name:             domain.Name,
 			Stage:            1,
 			StageManuallySet: false,
 			RawAttack:        false,
@@ -532,18 +571,6 @@ func clearProxyCache() {
 	for {
 		//Clear logs and maps every 2 minutes. (I know this is a lazy way to do it, tho for now it seems to be the most efficient and fast way to go about it)
 		firewall.Mutex.Lock()
-		for tcpRequest := range firewall.TcpRequests {
-			delete(firewall.TcpRequests, tcpRequest)
-		}
-		for unk := range firewall.UnkFps {
-			delete(firewall.UnkFps, unk)
-		}
-		for ip := range firewall.AccessIps {
-			delete(firewall.AccessIps, ip)
-		}
-		for ipCookie := range firewall.AccessIpsCookie {
-			delete(firewall.AccessIpsCookie, ipCookie)
-		}
 
 		proxyCpuUsage, pcuErr := strconv.ParseFloat(proxy.CpuUsage, 32)
 		if pcuErr != nil {
@@ -589,36 +616,60 @@ func clearProxyCache() {
 	}
 }
 
-func clearCache() {
-	domains.DomainsCache.Range(func(key, value any) bool {
-		cacheResp := value.(domains.CacheResponse)
-		if cacheResp.Domain == proxy.WatchedDomain {
-			domains.DomainsCache.Delete(key)
-		}
-		return true
-	})
-}
-
-func clearOutdatedCache() {
-
-	defer pnc.PanicHndl()
-
+// Iterate through the slider every 5 seconds
+func evaluateRatelimit() {
 	for {
-		currTime := int(time.Now().Unix())
-		domains.DomainsCache.Range(func(key, value any) bool {
-			cacheResp := value.(domains.CacheResponse)
-			if cacheResp.Timestamp < currTime {
-				domains.DomainsCache.Delete(key)
-			}
-			return true
-		})
-		reloadConfig()
 
 		firewall.Mutex.Lock()
-		utils.AddLogs("Cleared Outdated Cache", "debug")
-		firewall.Mutex.Unlock()
+		//Initialise Maps before they're ever written, as to save if statements during potential attack
+		for i := proxy.Last10SecondTimestamp; i < proxy.Last10SecondTimestamp+20; i = i + 10 {
+			if firewall.WindowAccessIps[i] == nil {
+				firewall.WindowAccessIps[i] = map[string]int{}
+			}
+			if firewall.WindowAccessIpsCookie[i] == nil {
+				firewall.WindowAccessIpsCookie[i] = map[string]int{}
+			}
+			if firewall.WindowUnkFps[i] == nil {
+				firewall.WindowUnkFps[i] = map[string]int{}
+			}
+		}
 
-		time.Sleep(5 * time.Hour)
+		// Delete outdated records & calculate requests for every ip
+		firewall.AccessIps = map[string]int{}
+		for windowTime, accessIPs := range firewall.WindowAccessIps {
+			if utils.TrimTime(windowTime)+proxy.RatelimitWindow < proxy.LastSecondTimestamp {
+				delete(firewall.WindowAccessIps, windowTime)
+			} else {
+				for IP, requests := range accessIPs {
+					firewall.AccessIps[IP] += requests
+				}
+			}
+		}
+		firewall.AccessIpsCookie = map[string]int{}
+		for windowTime, accessIPsCookie := range firewall.WindowAccessIpsCookie {
+			if utils.TrimTime(windowTime)+proxy.RatelimitWindow < proxy.LastSecondTimestamp {
+				delete(firewall.WindowAccessIpsCookie, windowTime)
+			} else {
+				for IP, requests := range accessIPsCookie {
+					firewall.AccessIpsCookie[IP] += requests
+				}
+			}
+		}
+		firewall.UnkFps = map[string]int{}
+		for windowTime, unkFps := range firewall.WindowUnkFps {
+			if utils.TrimTime(windowTime)+proxy.RatelimitWindow < proxy.LastSecondTimestamp {
+				delete(firewall.WindowUnkFps, windowTime)
+			} else {
+				for IP, requests := range unkFps {
+					firewall.UnkFps[IP] += requests
+				}
+			}
+		}
+		firewall.Mutex.Unlock()
+		proxy.Initialised = true
+
+		time.Sleep(5 * time.Second)
+
 	}
 }
 

@@ -16,13 +16,16 @@ import (
 	"net/http/httputil"
 	"net/url"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
+	"github.com/gofiber/fiber/v2/middleware/adaptor"
 	"github.com/kor44/gofilter"
 )
 
 func Load() {
+
 	file, err := os.Open("config.json")
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -34,31 +37,37 @@ func Load() {
 	defer file.Close()
 	json.NewDecoder(file).Decode(&domains.Config)
 
+	proxy.LessRam = domains.Config.Proxy.LowRam
+
 	proxy.Cloudflare = domains.Config.Proxy.Cloudflare
+
+	if domains.Config.Proxy.Network != "tcp" && domains.Config.Proxy.Network != "tcp4" && domains.Config.Proxy.Network != "tcp6" {
+		domains.Config.Proxy.Network = "tcp"
+	}
 
 	proxy.CookieSecret = domains.Config.Proxy.Secrets["cookie"]
 	if strings.Contains(proxy.CookieSecret, "CHANGE_ME") {
-		panic("[ " + utils.RedText("!") + " ] [ Cookie Secret Contains 'CHANGE_ME', Refusing To Load ]")
+		panic("[ " + utils.PrimaryColor("!") + " ] [ Cookie Secret Contains 'CHANGE_ME', Refusing To Load ]")
 	}
 
 	proxy.JSSecret = domains.Config.Proxy.Secrets["javascript"]
 	if strings.Contains(proxy.JSSecret, "CHANGE_ME") {
-		panic("[ " + utils.RedText("!") + " ] [ JS Secret Contains 'CHANGE_ME', Refusing To Load ]")
+		panic("[ " + utils.PrimaryColor("!") + " ] [ JS Secret Contains 'CHANGE_ME', Refusing To Load ]")
 	}
 
 	proxy.CaptchaSecret = domains.Config.Proxy.Secrets["captcha"]
 	if strings.Contains(proxy.CaptchaSecret, "CHANGE_ME") {
-		panic("[ " + utils.RedText("!") + " ] [ Captcha Secret Contains 'CHANGE_ME', Refusing To Load ]")
+		panic("[ " + utils.PrimaryColor("!") + " ] [ Captcha Secret Contains 'CHANGE_ME', Refusing To Load ]")
 	}
 
 	proxy.AdminSecret = domains.Config.Proxy.AdminSecret
 	if strings.Contains(proxy.AdminSecret, "CHANGE_ME") {
-		panic("[ " + utils.RedText("!") + " ] [ Admin Secret Contains 'CHANGE_ME', Refusing To Load ]")
+		panic("[ " + utils.PrimaryColor("!") + " ] [ Admin Secret Contains 'CHANGE_ME', Refusing To Load ]")
 	}
 
 	proxy.APISecret = domains.Config.Proxy.APISecret
 	if strings.Contains(proxy.APISecret, "CHANGE_ME") {
-		panic("[ " + utils.RedText("!") + " ] [ API Secret Contains 'CHANGE_ME'. Refusing To Load ]")
+		panic("[ " + utils.PrimaryColor("!") + " ] [ API Secret Contains 'CHANGE_ME'. Refusing To Load ]")
 	}
 
 	// Check if the Proxy Timeout Config has been set otherwise use default values
@@ -83,6 +92,18 @@ func Load() {
 		proxy.WriteTimeoutDuration = time.Duration(proxy.WriteTimeout).Abs() * time.Second
 	}
 
+	// Didn't think anyone would actually read through this mess
+	if len(domains.Config.Proxy.Colors) != 0 {
+		utils.SetColor(domains.Config.Proxy.Colors)
+	}
+
+	if domains.Config.Proxy.RatelimitWindow != 0 {
+		if domains.Config.Proxy.RatelimitWindow < 10 {
+			domains.Config.Proxy.RatelimitWindow = 10
+		}
+		proxy.RatelimitWindow = domains.Config.Proxy.RatelimitWindow
+	}
+
 	proxy.IPRatelimit = domains.Config.Proxy.Ratelimits["requests"]
 	proxy.FPRatelimit = domains.Config.Proxy.Ratelimits["unknownFingerprint"]
 	proxy.FailChallengeRatelimit = domains.Config.Proxy.Ratelimits["challengeFailures"]
@@ -98,36 +119,19 @@ func Load() {
 		ipInfo := false
 		firewallRules := []domains.Rule{}
 		rawFirewallRules := domains.Config.Domains[i].FirewallRules
-		for _, fwRule := range domains.Config.Domains[i].FirewallRules {
+		for index, fwRule := range domains.Config.Domains[i].FirewallRules {
 
 			if strings.Contains(fwRule.Expression, "ip.country") || strings.Contains(fwRule.Expression, "ip.asn") {
 				ipInfo = true
 			}
 			rule, err := gofilter.NewFilter(fwRule.Expression)
 			if err != nil {
-				panic("[ " + utils.RedText("!") + " ] [ Error Loading Custom Firewall Rules: " + utils.RedText(err.Error()) + " ]")
+				panic("[ " + utils.PrimaryColor("!") + " ] [ Error Loading Custom Firewall Rules For " + domain.Name + " ( Rule " + strconv.Itoa(index) + " ) : " + utils.PrimaryColor(err.Error()) + " ]")
 			}
 
 			firewallRules = append(firewallRules, domains.Rule{
 				Filter: rule,
 				Action: fwRule.Action,
-			})
-		}
-
-		cacheRules := []domains.Rule{}
-		rawCacheRules := domains.Config.Domains[i].CacheRules
-		for _, caRule := range domains.Config.Domains[i].CacheRules {
-
-			proxy.CacheEnabled = true
-
-			rule, err := gofilter.NewFilter(caRule.Expression)
-			if err != nil {
-				panic("[ " + utils.RedText("!") + " ] [ Error Loading Custom Cache Rules: " + utils.RedText(err.Error()) + " ]")
-			}
-
-			cacheRules = append(cacheRules, domains.Rule{
-				Filter: rule,
-				Action: caRule.Action,
 			})
 		}
 
@@ -137,12 +141,14 @@ func Load() {
 		})
 		dProxy.Transport = &server.RoundTripper{}
 
+		dProxyHandler := adaptor.HTTPHandler(dProxy)
+
 		var cert tls.Certificate = tls.Certificate{}
 		if !proxy.Cloudflare {
 			var certErr error
 			cert, certErr = tls.LoadX509KeyPair(domain.Certificate, domain.Key)
 			if certErr != nil {
-				panic("[ " + utils.RedText("!") + " ] [ " + utils.RedText("Error Loading Certificates: "+certErr.Error()) + " ]")
+				panic("[ " + utils.PrimaryColor("!") + " ] [ " + utils.PrimaryColor("Error Loading Certificates: "+certErr.Error()) + " ]")
 			}
 		}
 
@@ -153,10 +159,7 @@ func Load() {
 			IPInfo:         ipInfo,
 			RawCustomRules: rawFirewallRules,
 
-			CacheRules:    cacheRules,
-			RawCacheRules: rawCacheRules,
-
-			DomainProxy:        dProxy,
+			DomainProxy:        dProxyHandler,
 			DomainCertificates: cert,
 			DomainWebhooks: domains.WebhookSettings{
 				URL:            domain.Webhook.URL,
@@ -175,9 +178,16 @@ func Load() {
 		})
 
 		firewall.Mutex.Lock()
+
+		if domain.Stage2Difficulty == 0 {
+			domain.Stage2Difficulty = 5
+		}
+
 		domains.DomainsData[domain.Name] = domains.DomainData{
+			Name:             domain.Name,
 			Stage:            1,
 			StageManuallySet: false,
+			Stage2Difficulty: domain.Stage2Difficulty,
 			RawAttack:        false,
 			BypassAttack:     false,
 			LastLogs:         []string{},
@@ -203,10 +213,12 @@ func Load() {
 
 	firewall.Mutex.Lock()
 	domains.DomainsData["debug"] = domains.DomainData{
+		Name:             "debug",
 		Stage:            0,
 		StageManuallySet: false,
 		RawAttack:        false,
 		BypassAttack:     false,
+		BufferCooldown:   0,
 		LastLogs:         []string{},
 
 		TotalRequests:    0,
@@ -221,11 +233,12 @@ func Load() {
 		PeakRequestsBypassedPerSecond: 0,
 		RequestLogger:                 []domains.RequestLog{},
 	}
+
 	firewall.Mutex.Unlock()
 
 	vcErr := VersionCheck()
 	if vcErr != nil {
-		panic("[ " + utils.RedText("!") + " ] [ " + vcErr.Error() + " ]")
+		panic("[ " + utils.PrimaryColor("!") + " ] [ " + vcErr.Error() + " ]")
 	}
 
 	if len(domains.Domains) == 0 {
@@ -257,8 +270,8 @@ func VersionCheck() error {
 
 	if proxyVersions.StableVersion > proxy.ProxyVersion {
 
-		fmt.Println("[ " + utils.RedText("!") + " ] [ New Proxy Version " + fmt.Sprint(proxyVersions.StableVersion) + " Found. You Are using " + fmt.Sprint(proxy.ProxyVersion) + ". Consider Downloading The New Version From Github Or " + proxyVersions.Download + " ]")
-		fmt.Println("[ " + utils.RedText("+") + " ] [ Automatically Starting Proxy In 10 Seconds ]")
+		fmt.Println("[ " + utils.PrimaryColor("!") + " ] [ New Proxy Version " + fmt.Sprint(proxyVersions.StableVersion) + " Found. You Are using " + fmt.Sprint(proxy.ProxyVersion) + ". Consider Downloading The New Version From Github Or " + proxyVersions.Download + " ]")
+		fmt.Println("[ " + utils.PrimaryColor("+") + " ] [ Automatically Starting Proxy In 10 Seconds ]")
 
 		time.Sleep(10 * time.Second)
 
