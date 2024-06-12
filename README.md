@@ -1,7 +1,3 @@
-# **Attention**
-
-This is the `lite` version of balooProxy. Instead of `net/http` it uses `gofiber` as to increase performance at the cost of features. This version only supports http/1(.1) and some custom firewall fields might not be supported
-
 # **Features**
 
 ## **TLS-Fingerprinting**
@@ -18,9 +14,17 @@ balooProxy comes with `3 distinct challenges`, in order to defend against bots/d
 
 The cookie challenge is completely invisible and supported by every webbrowser, aswell as most http libraries. It is an effective method to defend against simple ddos attacks
 
-### **Invisible JS Challenge**
+### **PoW JS Challenge**
 
-The invisible js challenge allows you to reliably block slightly more advanced bots while impacting the user experience as little as possible 
+The PoW JS challenge allows you to reliably block slightly more advanced bots while impacting the user experience as little as possible 
+
+- Difficulty 5: ~3.100 Seconds
+- Difficulty 4: ~0.247 Seconds
+- Difficulty 3: ~0.244 Seconds
+- Difficulty 2: ~0.215 Seconds
+- Difficulty 1: ~0.212 Seconds
+
+![Pow JS Challenge](https://cdn.discordapp.com/attachments/980872824577216532/1250383254171680830/image.png)
 
 ### **Custom Captcha**
 
