@@ -36,13 +36,7 @@ func Load() {
 	defer file.Close()
 	json.NewDecoder(file).Decode(&domains.Config)
 
-	proxy.LessRam = domains.Config.Proxy.LowRam
-
 	proxy.Cloudflare = domains.Config.Proxy.Cloudflare
-
-	if domains.Config.Proxy.Network != "tcp" && domains.Config.Proxy.Network != "tcp4" && domains.Config.Proxy.Network != "tcp6" {
-		domains.Config.Proxy.Network = "tcp"
-	}
 
 	proxy.CookieSecret = domains.Config.Proxy.Secrets["cookie"]
 	if strings.Contains(proxy.CookieSecret, "CHANGE_ME") {

@@ -19,9 +19,7 @@ func Generate() {
 
 	gConfig := domains.Configuration{
 		Proxy: domains.Proxy{
-			LowRam:      utils.AskBool("Use Less RAM But More CPU? (y/N)", false),
 			Cloudflare:  utils.AskBool("Use This Proxy With Cloudflare? (y/N)", false),
-			Network:     "tcp",
 			AdminSecret: utils.RandomString(25),
 			APISecret:   utils.RandomString(30),
 			Timeout: domains.TimeoutSettings{
