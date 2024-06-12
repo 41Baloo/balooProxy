@@ -244,9 +244,9 @@ func printStats() {
 
 	fmt.Println("")
 
-	firewall.Mutex.Lock()
+	firewall.Mutex.RLock()
 	domainData := domains.DomainsData[proxy.WatchedDomain]
-	firewall.Mutex.Unlock()
+	firewall.Mutex.RUnlock()
 
 	if domainData.Stage == 0 && proxy.WatchedDomain != "debug" {
 		if proxy.WatchedDomain != "" {
