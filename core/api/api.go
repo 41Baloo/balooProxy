@@ -7,75 +7,85 @@ import (
 	"goProxy/core/firewall"
 	"goProxy/core/proxy"
 	"goProxy/core/utils"
-
-	"github.com/gofiber/fiber/v2"
+	"io"
+	"net/http"
+	"strings"
 )
 
-func Process(c *fiber.Ctx, domainData domains.DomainData) bool {
+func Process(writer http.ResponseWriter, request *http.Request, domainData domains.DomainData) bool {
 
-	if c.GetReqHeaders()["Proxy-Secret"] != proxy.APISecret {
+	if request.Header.Get("proxy-secret") != proxy.APISecret {
 		return false
 	}
 
-	var apiRequest API_REQUEST
-	err := json.Unmarshal(c.Body(), &apiRequest)
+	reqBody, err := io.ReadAll(request.Body)
 	if err != nil {
-		APIResponse(c, false, map[string]interface{}{
+		APIResponse(writer, false, map[string]interface{}{
+			"ERROR": ERR_BODY_READ_FAILED,
+		})
+	}
+
+	defer request.Body.Close()
+
+	var apiRequest API_REQUEST
+	err = json.Unmarshal(reqBody, &apiRequest)
+	if err != nil {
+		APIResponse(writer, false, map[string]interface{}{
 			"ERROR": ERR_JSON_READ_FAILED,
 		})
 		return true
 	}
 
 	if apiRequest.Domain == "" {
-		handleProxyActions(apiRequest.Action, c)
+		handleProxyActions(apiRequest.Action, writer)
 		return true
 	}
 
 	uncastedDomainSettings, ok := domains.DomainsMap.Load(apiRequest.Domain)
 	if !ok {
-		APIResponse(c, false, map[string]interface{}{
+		APIResponse(writer, false, map[string]interface{}{
 			"ERROR": ERR_DOMAIN_NOT_FOUND,
 		})
 		return true
 	}
 	domainSettings, _ := uncastedDomainSettings.(domains.DomainSettings)
 
-	handleDomainActions(apiRequest.Action, c, &domainData, &domainSettings)
+	handleDomainActions(apiRequest.Action, writer, &domainData, &domainSettings)
 	return true
 }
 
-func handleProxyActions(action string, c *fiber.Ctx) {
+func handleProxyActions(action string, writer http.ResponseWriter) {
 	switch action {
 	case "GET_PROXY_STATS":
-		APIResponse(c, true, map[string]interface{}{
+		APIResponse(writer, true, map[string]interface{}{
 			"CPU_USAGE": proxy.CpuUsage,
 			"RAM_USAGE": proxy.RamUsage,
 		})
 	case "GET_PROXY_STATS_CPU_USAGE":
-		APIResponse(c, true, map[string]interface{}{
+		APIResponse(writer, true, map[string]interface{}{
 			"CPU_USAGE": proxy.CpuUsage,
 		})
 	case "GET_PROXY_STATS_RAM_USAGE":
-		APIResponse(c, true, map[string]interface{}{
+		APIResponse(writer, true, map[string]interface{}{
 			"RAM_USAGE": proxy.RamUsage,
 		})
 	case "GET_IP_REQUESTS":
-		firewall.Mutex.Lock()
+		firewall.Mutex.RLock()
 		ipsAll := firewall.AccessIps
 		ipsCookie := firewall.AccessIpsCookie
-		firewall.Mutex.Unlock()
+		firewall.Mutex.RUnlock()
 
-		APIResponse(c, true, map[string]interface{}{
+		APIResponse(writer, true, map[string]interface{}{
 			"TOTAL_IP_REQUESTS":     ipsAll,
 			"CHALLENGE_IP_REQUESTS": ipsCookie,
 		})
 	//Only returns UNK Fingerprints
 	case "GET_FINGERPRINT_REQUESTS":
-		firewall.Mutex.Lock()
+		firewall.Mutex.RLock()
 		ipsFps := firewall.UnkFps
-		firewall.Mutex.Unlock()
+		firewall.Mutex.RUnlock()
 
-		APIResponse(c, true, map[string]interface{}{
+		APIResponse(writer, true, map[string]interface{}{
 			"TOTAL_FINGERPRINT_REQUESTS": ipsFps,
 		})
 	case "GET_IP_CACHE":
@@ -85,7 +95,7 @@ func handleProxyActions(action string, c *fiber.Ctx) {
 			return true
 		})
 
-		APIResponse(c, true, map[string]interface{}{
+		APIResponse(writer, true, map[string]interface{}{
 			"IP_CACHE": cacheIps,
 		})
 	// Useful to fill up your ipCache and see how your proxy performs with high memory usage
@@ -96,97 +106,104 @@ func handleProxyActions(action string, c *fiber.Ctx) {
 		}
 		firewall.Mutex.Unlock()
 
-		APIResponse(c, true, map[string]interface{}{})
+		APIResponse(writer, true, map[string]interface{}{})
 	default:
-		APIResponse(c, false, map[string]interface{}{
+		APIResponse(writer, false, map[string]interface{}{
 			"ERROR": ERR_ACTION_NOT_FOUND,
 		})
 	}
 }
 
-func handleDomainActions(action string, c *fiber.Ctx, domainData *domains.DomainData, domainSettings *domains.DomainSettings) {
+func handleDomainActions(action string, writer http.ResponseWriter, domainData *domains.DomainData, domainSettings *domains.DomainSettings) {
 	switch action {
 	case "GET_TOTAL_REQUESTS":
-		APIResponse(c, true, map[string]interface{}{
+		APIResponse(writer, true, map[string]interface{}{
 			"TOTAL_REQUESTS": domainData.TotalRequests,
 		})
 	case "GET_BYPASSED_REQUESTS":
-		APIResponse(c, true, map[string]interface{}{
+		APIResponse(writer, true, map[string]interface{}{
 			"BYPASSED_REQUESTS": domainData.BypassedRequests,
 		})
 	case "GET_TOTAL_REQUESTS_PER_SECOND":
-		APIResponse(c, true, map[string]interface{}{
+		APIResponse(writer, true, map[string]interface{}{
 			"TOTAL_REQUESTS_REQUESTS_PER_SECOND": domainData.RequestsPerSecond,
 		})
 	case "GET_BYPASSED_REQUESTS_PER_SECOND":
-		APIResponse(c, true, map[string]interface{}{
+		APIResponse(writer, true, map[string]interface{}{
 			"BYPASSED_REQUESTS_REQUESTS_PER_SECOND": domainData.RequestsBypassedPerSecond,
 		})
 	case "GET_FIREWALL_RULES":
-		APIResponse(c, true, map[string]interface{}{
+		APIResponse(writer, true, map[string]interface{}{
 			"FIREWALL_RULES": domainSettings.RawCustomRules,
 		})
 	// This is still janky since it contains the formatting from the console & also changes size depending on the console size
 	case "GET_LOGS":
-		APIResponse(c, true, map[string]interface{}{
+		APIResponse(writer, true, map[string]interface{}{
 			"LOGS": domainData.LastLogs,
 		})
 	default:
-		APIResponse(c, false, map[string]interface{}{
+		APIResponse(writer, false, map[string]interface{}{
 			"ERROR": ERR_ACTION_NOT_FOUND,
 		})
 	}
 }
 
-func CreateAPIRoutes(httpServer *fiber.App) {
+func CreateAPIRoutes() {
 
-	httpServer.Get("/_bProxy/api/v2/:domain/:action", func(c *fiber.Ctx) error {
-
-		if c.GetReqHeaders()["Proxy-Secret"] != proxy.APISecret {
-			return nil
+	http.HandleFunc("/_bProxy/api/v2/", func(w http.ResponseWriter, r *http.Request) {
+		if r.Header.Get("Proxy-Secret") != proxy.APISecret {
+			return
 		}
 
-		requestedDomain := c.Params("domain")
+		path := strings.TrimPrefix(r.URL.Path, "/_bProxy/api/v2/")
+		parts := strings.Split(path, "/")
 
-		uncastedDomainSettingsdomain, ok := domains.DomainsMap.Load(requestedDomain)
-		if !ok {
-			APIResponse(c, false, map[string]interface{}{
-				"ERROR": ERR_DOMAIN_NOT_FOUND,
-			})
-			return nil
-		}
-		domainSettingsdomain, _ := uncastedDomainSettingsdomain.(domains.DomainSettings)
-
-		requestedAction := c.Params("action")
-
-		firewall.Mutex.Lock()
-		domainData := domains.DomainsData[requestedDomain]
-		firewall.Mutex.Unlock()
-
-		handleDomainActions(requestedAction, c, &domainData, &domainSettingsdomain)
-
-		return nil
-	})
-	httpServer.Get("/_bProxy/api/v2/:action", func(c *fiber.Ctx) error {
-
-		if c.GetReqHeaders()["Proxy-Secret"] != proxy.APISecret {
-			return nil
+		if len(parts) == 0 || (len(parts) == 1 && parts[0] == "") {
+			http.Error(w, "Bad Request", http.StatusBadRequest)
+			return
 		}
 
-		requestedAction := c.Params("action")
+		if len(parts) == 1 {
 
-		handleProxyActions(requestedAction, c)
+			// /:action
 
-		return nil
+			handleProxyActions(parts[0], w)
+		} else {
+
+			//  /:domain/:action
+
+			uncastedDomainSettingsdomain, ok := domains.DomainsMap.Load(parts[0])
+			if !ok {
+				APIResponse(w, false, map[string]interface{}{
+					"ERROR": ERR_DOMAIN_NOT_FOUND,
+				})
+				return
+			}
+			domainSettingsdomain, _ := uncastedDomainSettingsdomain.(domains.DomainSettings)
+
+			firewall.Mutex.RLock()
+			domainData := domains.DomainsData[parts[0]]
+			firewall.Mutex.RUnlock()
+
+			handleDomainActions(parts[1], w, &domainData, &domainSettingsdomain)
+		}
 	})
 }
 
-func APIResponse(c *fiber.Ctx, success bool, response map[string]interface{}) {
+func APIResponse(writer http.ResponseWriter, success bool, response map[string]interface{}) error {
+
+	writer.Header().Set("Content-Type", "application/json")
 
 	apiResponse := API_RESPONSE{
 		Success:  success,
 		Response: response,
 	}
 
-	c.JSON(apiResponse)
+	jsonResponse, err := json.Marshal(apiResponse)
+	if err != nil {
+		return err
+	}
+
+	fmt.Fprint(writer, string(jsonResponse))
+	return nil
 }

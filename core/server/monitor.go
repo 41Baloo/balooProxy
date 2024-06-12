@@ -14,7 +14,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/gofiber/fiber/v2/middleware/adaptor"
 	"github.com/inancgumus/screen"
 	"github.com/kor44/gofilter"
 	"github.com/shirou/gopsutil/cpu"
@@ -501,8 +500,6 @@ func reloadConfig() {
 		})
 		dProxy.Transport = &RoundTripper{}
 
-		dProxyHandler := adaptor.HTTPHandler(dProxy)
-
 		var cert tls.Certificate = tls.Certificate{}
 		if !proxy.Cloudflare {
 			var certErr error
@@ -519,7 +516,7 @@ func reloadConfig() {
 			IPInfo:         ipInfo,
 			RawCustomRules: rawFirewallRules,
 
-			DomainProxy:        dProxyHandler,
+			DomainProxy:        dProxy,
 			DomainCertificates: cert,
 			DomainWebhooks: domains.WebhookSettings{
 				URL:            domain.Webhook.URL,

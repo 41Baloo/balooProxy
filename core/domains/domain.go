@@ -3,10 +3,10 @@ package domains
 import (
 	"crypto/tls"
 	"net/http"
+	"net/http/httputil"
 	"sync"
 	"time"
 
-	"github.com/gofiber/fiber/v2"
 	"github.com/kor44/gofilter"
 )
 
@@ -46,7 +46,7 @@ type DomainSettings struct {
 	IPInfo         bool
 	RawCustomRules []JsonRule
 
-	DomainProxy        func(*fiber.Ctx) error
+	DomainProxy        *httputil.ReverseProxy
 	DomainCertificates tls.Certificate
 	DomainWebhooks     WebhookSettings
 

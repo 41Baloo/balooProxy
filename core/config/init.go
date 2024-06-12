@@ -20,7 +20,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/gofiber/fiber/v2/middleware/adaptor"
 	"github.com/kor44/gofilter"
 )
 
@@ -141,8 +140,6 @@ func Load() {
 		})
 		dProxy.Transport = &server.RoundTripper{}
 
-		dProxyHandler := adaptor.HTTPHandler(dProxy)
-
 		var cert tls.Certificate = tls.Certificate{}
 		if !proxy.Cloudflare {
 			var certErr error
@@ -159,7 +156,7 @@ func Load() {
 			IPInfo:         ipInfo,
 			RawCustomRules: rawFirewallRules,
 
-			DomainProxy:        dProxyHandler,
+			DomainProxy:        dProxy,
 			DomainCertificates: cert,
 			DomainWebhooks: domains.WebhookSettings{
 				URL:            domain.Webhook.URL,

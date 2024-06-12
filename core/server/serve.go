@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"context"
 	"crypto/tls"
-	"goProxy/core/api"
+	"fmt"
 	"goProxy/core/domains"
 	"goProxy/core/firewall"
 	"goProxy/core/pnc"
@@ -15,122 +15,90 @@ import (
 	"strings"
 	"sync"
 	"time"
-
-	"github.com/goccy/go-json"
-	"github.com/gofiber/fiber/v2"
-	"github.com/gofiber/fiber/v2/middleware/monitor"
 )
 
 var (
 	transportMap = sync.Map{}
 )
 
-type callbackListener struct {
-	net.Listener
-}
-
-type callbackConn struct {
-	net.Conn
-}
-
-func (ln callbackListener) Accept() (net.Conn, error) {
-	conn, err := ln.Listener.Accept()
-	if err != nil {
-		return nil, err
-	}
-	return callbackConn{Conn: conn}, nil
-}
-
-func (c callbackConn) Close() error {
-	firewall.Mutex.Lock()
-	delete(firewall.Connections, c.RemoteAddr().String())
-	firewall.Mutex.Unlock()
-	return c.Conn.Close()
-}
-
 func Serve() {
 
 	defer pnc.PanicHndl()
 
-	fbConfig := fiber.Config{
-		ReduceMemoryUsage:         domains.Config.Proxy.LowRam,
-		Network:                   domains.Config.Proxy.Network,
-		DisableStartupMessage:     true,
-		DisableDefaultContentType: true,
-		JSONEncoder:               json.Marshal,
-		JSONDecoder:               json.Unmarshal,
-		IdleTimeout:               proxy.IdleTimeoutDuration,
-		ReadTimeout:               proxy.ReadTimeoutDuration,
-		WriteTimeout:              proxy.WriteTimeoutDuration,
-	}
-
 	if domains.Config.Proxy.Cloudflare {
 
-		httpServer := fiber.New(fbConfig)
-
-		httpServer.Use(func(c *fiber.Ctx) error {
-			return Middleware(c)
-		})
-
-		if domains.Config.Proxy.Monitor {
-			httpServer.Get("/_bProxy/"+proxy.AdminSecret+"/monitor", monitor.New(monitor.Config{
-				Title:   "balooProxy Metrics",
-				Refresh: 1 * time.Second,
-			}))
+		service := &http.Server{
+			IdleTimeout:       proxy.IdleTimeoutDuration,
+			ReadTimeout:       proxy.ReadTimeoutDuration,
+			WriteTimeout:      proxy.WriteTimeoutDuration,
+			ReadHeaderTimeout: proxy.ReadHeaderTimeoutDuration,
+			Addr:              ":80",
+			MaxHeaderBytes:    1 << 20,
 		}
 
-		api.CreateAPIRoutes(httpServer) // API v2
+		service.SetKeepAlivesEnabled(true)
+		service.Handler = http.HandlerFunc(Middleware)
 
-		if err := httpServer.Listen(":80"); err != nil {
+		if err := service.ListenAndServe(); err != nil {
 			panic(err)
 		}
 	} else {
 
-		// http to https server
-		httpServer := fiber.New(fbConfig)
-		httpServer.Use(func(c *fiber.Ctx) error {
-			return c.Redirect("https://"+c.Hostname()+c.OriginalURL(), fiber.StatusMovedPermanently)
-		})
-
-		// Main https server
-		httpsServer := fiber.New(fbConfig)
-
-		tlsHandler := &fiber.TLSHandler{}
-		serverListener, errListener := tls.Listen("tcp", ":443", &tls.Config{
-			GetConfigForClient: firewall.Fingerprint,
-			GetCertificate: func(chi *tls.ClientHelloInfo) (*tls.Certificate, error) {
-				tlsHandler.GetClientInfo(chi)
-				return domains.GetCertificate(chi)
+		service := &http.Server{
+			IdleTimeout:       proxy.IdleTimeoutDuration,
+			ReadTimeout:       proxy.ReadTimeoutDuration,
+			WriteTimeout:      proxy.WriteTimeoutDuration,
+			ReadHeaderTimeout: proxy.ReadHeaderTimeoutDuration,
+			ConnState:         firewall.OnStateChange,
+			Addr:              ":80",
+			MaxHeaderBytes:    1 << 20,
+		}
+		serviceH := &http.Server{
+			IdleTimeout:       proxy.IdleTimeoutDuration,
+			ReadTimeout:       proxy.ReadTimeoutDuration,
+			WriteTimeout:      proxy.WriteTimeoutDuration,
+			ReadHeaderTimeout: proxy.ReadHeaderTimeoutDuration,
+			ConnState:         firewall.OnStateChange,
+			Addr:              ":443",
+			TLSConfig: &tls.Config{
+				GetConfigForClient: firewall.Fingerprint,
+				GetCertificate:     domains.GetCertificate,
+				Renegotiation:      tls.RenegotiateOnceAsClient,
 			},
-		})
-
-		loggingLn := callbackListener{Listener: serverListener}
-
-		if errListener != nil {
-			panic(errListener)
+			MaxHeaderBytes: 1 << 20,
 		}
 
-		httpsServer.SetTLSHandler(tlsHandler)
+		service.Handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			firewall.Mutex.RLock()
+			domainData, domainFound := domains.DomainsData[r.Host]
+			firewall.Mutex.RUnlock()
 
-		httpsServer.Use(func(c *fiber.Ctx) error {
-			return Middleware(c)
+			if !domainFound {
+				w.Header().Set("Content-Type", "text/plain")
+				fmt.Fprintf(w, "balooProxy: "+r.Host+" does not exist. If you are the owner please check your config.json if you believe this is a mistake")
+				return
+			}
+
+			firewall.Mutex.Lock()
+			domainData = domains.DomainsData[r.Host]
+			domainData.TotalRequests++
+			domains.DomainsData[r.Host] = domainData
+			firewall.Mutex.Unlock()
+
+			http.Redirect(w, r, "https://"+r.Host+r.URL.Path+r.URL.RawQuery, http.StatusMovedPermanently)
 		})
 
-		if domains.Config.Proxy.Monitor {
-			httpsServer.Get("/_bProxy/"+proxy.AdminSecret+"/monitor", monitor.New(monitor.Config{
-				Title:   "balooProxy Metrics",
-				Refresh: 1 * time.Second,
-			}))
-		}
+		service.SetKeepAlivesEnabled(true)
+		serviceH.Handler = http.HandlerFunc(Middleware)
 
 		go func() {
 			defer pnc.PanicHndl()
-			if err := httpsServer.Listener(loggingLn); err != nil {
+			if err := serviceH.ListenAndServeTLS("", ""); err != nil {
 				panic(err)
 			}
 		}()
 
-		if err := httpServer.Listen(":80"); err != nil {
+		if err := service.ListenAndServe(); err != nil {
 			panic(err)
 		}
 	}

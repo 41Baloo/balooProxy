@@ -1,6 +1,8 @@
 package firewall
 
 import (
+	"net"
+	"net/http"
 	"sync"
 )
 
@@ -32,3 +34,17 @@ var (
 
 	Connections = map[string]string{}
 )
+
+func OnStateChange(conn net.Conn, state http.ConnState) {
+
+	remoteAddr := conn.RemoteAddr().String()
+
+	switch state {
+	case http.StateNew:
+	case http.StateHijacked, http.StateClosed:
+		//Remove connection from list of fingerprints as it's no longer needed
+		Mutex.Lock()
+		delete(Connections, remoteAddr)
+		Mutex.Unlock()
+	}
+}

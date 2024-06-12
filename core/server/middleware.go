@@ -3,6 +3,7 @@ package server
 import (
 	"bytes"
 	"encoding/base64"
+	"fmt"
 	"goProxy/core/api"
 	"goProxy/core/domains"
 	"goProxy/core/firewall"
@@ -14,26 +15,27 @@ import (
 	"math"
 	"math/rand"
 	"net"
+	"net/http"
 	"strconv"
 	"strings"
 
-	"github.com/gofiber/fiber/v2"
 	"github.com/kor44/gofilter"
 )
 
-func Middleware(c *fiber.Ctx) error {
+func Middleware(writer http.ResponseWriter, request *http.Request) {
 
 	// defer pnc.PanicHndl() we wont do this during prod, to avoid overhead
 
-	reqHeaders := c.GetReqHeaders()
-	domainName := utils.SafeString(reqHeaders["Host"])
+	domainName := request.Host
+
 	firewall.Mutex.RLock()
 	domainData := domains.DomainsData[domainName]
 	firewall.Mutex.RUnlock()
 
 	if domainData.Stage == 0 {
-		c.SendString("balooProxy: " + domainName + " does not exist. If you are the owner please check your config.json if you believe this is a mistake")
-		return nil
+		writer.Header().Set("Content-Type", "text/plain")
+		fmt.Fprintf(writer, "balooProxy: "+domainName+" does not exist. If you are the owner please check your config.json if you believe this is a mistake")
+		return
 	}
 
 	var ip string
@@ -45,11 +47,9 @@ func Middleware(c *fiber.Ctx) error {
 	var ipCount int
 	var ipCountCookie int
 
-	cContext := c.Context()
-
 	if domains.Config.Proxy.Cloudflare {
 
-		ip = utils.SafeString(reqHeaders["Cf-Connecting-Ip"])
+		ip = request.Header.Get("Cf-Connecting-Ip")
 
 		tlsFp = "Cloudflare"
 		browser = "Cloudflare"
@@ -61,11 +61,11 @@ func Middleware(c *fiber.Ctx) error {
 		ipCountCookie = firewall.AccessIpsCookie[ip]
 		firewall.Mutex.RUnlock()
 	} else {
-		ip = c.IP()
+		ip = strings.Split(request.RemoteAddr, ":")[0]
 
 		//Retrieve information about the client
 		firewall.Mutex.RLock()
-		tlsFp = firewall.Connections[cContext.RemoteAddr().String()]
+		tlsFp = firewall.Connections[request.RemoteAddr]
 		fpCount = firewall.UnkFps[tlsFp]
 		ipCount = firewall.AccessIps[ip]
 		ipCountCookie = firewall.AccessIpsCookie[ip]
@@ -83,28 +83,31 @@ func Middleware(c *fiber.Ctx) error {
 	domains.DomainsData[domainName] = domainData
 	firewall.Mutex.Unlock()
 
-	c.Append("baloo-proxy-lite", "1.5")
+	writer.Header().Set("baloo-Proxy", "1.5")
 
 	//Start the suspicious level where the stage currently is
 	susLv := domainData.Stage
 
 	//Ratelimit faster if client repeatedly fails the verification challenge (feel free to play around with the threshhold)
 	if ipCountCookie > proxy.FailChallengeRatelimit {
-		c.SendString("Blocked by BalooProxy.\nYou have been ratelimited. (R1)")
-		return nil
+		writer.Header().Set("Content-Type", "text/plain")
+		fmt.Fprintf(writer, "Blocked by BalooProxy.\nYou have been ratelimited. (R1)")
+		return
 	}
 
 	//Ratelimit spamming Ips (feel free to play around with the threshhold)
 	if ipCount > proxy.IPRatelimit {
-		c.SendString("Blocked by BalooProxy.\nYou have been ratelimited. (R2)")
-		return nil
+		writer.Header().Set("Content-Type", "text/plain")
+		fmt.Fprintf(writer, "Blocked by BalooProxy.\nYou have been ratelimited. (R2)")
+		return
 	}
 
 	//Ratelimit fingerprints that don't belong to major browsers
 	if browser == "" {
 		if fpCount > proxy.FPRatelimit {
-			c.SendString("Blocked by BalooProxy.\nYou have been ratelimited. (R3)")
-			return nil
+			writer.Header().Set("Content-Type", "text/plain")
+			fmt.Fprintf(writer, "Blocked by BalooProxy.\nYou have been ratelimited. (R3)")
+			return
 		}
 
 		firewall.Mutex.Lock()
@@ -115,8 +118,9 @@ func Middleware(c *fiber.Ctx) error {
 	//Block user-specified fingerprints
 	forbiddenFp := firewall.ForbiddenFingerprints[tlsFp]
 	if forbiddenFp != "" {
-		c.SendString("Blocked by BalooProxy.\nYour browser " + forbiddenFp + " is not allowed.")
-		return nil
+		writer.Header().Set("Content-Type", "text/plain")
+		fmt.Fprintf(writer, "Blocked by BalooProxy.\nYour browser %s is not allowed.", forbiddenFp)
+		return
 	}
 
 	//Demonstration of how to use "susLv". Essentially allows you to challenge specific requests with a higher challenge
@@ -131,10 +135,7 @@ func Middleware(c *fiber.Ctx) error {
 		ipInfoCountry, ipInfoASN = utils.GetIpInfo(ip)
 	}
 
-	reqUa := string(cContext.UserAgent())
-	cPath := c.Path()
-	cOURL := utils.SafeString(c.OriginalURL())
-	cookieString := utils.SafeString(reqHeaders["Cookie"])
+	reqUa := request.UserAgent()
 
 	if len(domainSettings.CustomRules) != 0 {
 		requestVariables := gofilter.Message{
@@ -148,11 +149,13 @@ func Middleware(c *fiber.Ctx) error {
 			"ip.challenge_requests": ipCountCookie,
 
 			"http.host":       domainName,
-			"http.method":     c.Method(),
-			"http.url":        c.BaseURL(),
-			"http.path":       cPath,
+			"http.version":    request.Proto,
+			"http.method":     request.Method,
+			"http.url":        request.RequestURI,
+			"http.query":      request.URL.RawQuery,
+			"http.path":       request.URL.Path,
 			"http.user_agent": strings.ToLower(reqUa),
-			"http.cookie":     cookieString,
+			"http.cookie":     request.Header.Get("Cookie"),
 
 			"proxy.stage":         domainData.Stage,
 			"proxy.cloudflare":    domains.Config.Proxy.Cloudflare,
@@ -186,8 +189,9 @@ func Middleware(c *fiber.Ctx) error {
 		case 3:
 			encryptedIP = utils.Encrypt(accessKey, proxy.CaptchaOTP)
 		default:
-			c.SendString("Blocked by BalooProxy.\nSuspicious request of level " + susLvStr)
-			return nil
+			writer.Header().Set("Content-Type", "text/plain")
+			fmt.Fprintf(writer, "Blocked by BalooProxy.\nSuspicious request of level %s (base %d)", susLvStr, domainData.Stage)
+			return
 		}
 		firewall.CacheIps.Store(accessKey+susLvStr, encryptedIP)
 	} else {
@@ -199,7 +203,7 @@ func Middleware(c *fiber.Ctx) error {
 	}
 
 	//Check if client provided correct verification result
-	if !strings.Contains(cookieString, "__bProxy_v="+encryptedIP) {
+	if !strings.Contains(request.Header.Get("Cookie"), "__bProxy_v="+encryptedIP) {
 
 		firewall.Mutex.Lock()
 		firewall.WindowAccessIpsCookie[proxy.Last10SecondTimestamp][ip]++
@@ -210,15 +214,15 @@ func Middleware(c *fiber.Ctx) error {
 		case 0:
 			//This request is not to be challenged (whitelist)
 		case 1:
-			c.Append("Set-Cookie", "_1__bProxy_v="+encryptedIP+"; SameSite=Lax; path=/; Secure")
-			c.Redirect(cOURL, 302)
-			return nil
+			writer.Header().Set("Set-Cookie", "_1__bProxy_v="+encryptedIP+"; SameSite=Lax; path=/; Secure")
+			http.Redirect(writer, request, request.URL.RequestURI(), http.StatusFound)
+			return
 		case 2:
 			publicSalt := encryptedIP[:len(encryptedIP)-domainData.Stage2Difficulty]
-			c.Append("Content-Type", "text/html")
-			c.Append("Cache-Control", "no-store, no-cache, must-revalidate, max-age=0") // Prevent special(ed) browsers from caching the challenge
-			c.SendString(`<!doctypehtml><html lang=en><meta charset=UTF-8><meta content="width=device-width,initial-scale=1"name=viewport><title>Completing challenge ...</title><style>body,html{height:100%;width:100%;margin:0;display:flex;flex-direction:column;justify-content:center;align-items:center;background-color:#f0f0f0;font-family:Arial,sans-serif}.loader{display:flex;justify-content:space-around;align-items:center;width:100px;height:100px}.loader div{width:20px;height:20px;background-color:#333;border-radius:50%;animation:bounce .6s infinite alternate}.loader div:nth-child(2){animation-delay:.2s}.loader div:nth-child(3){animation-delay:.4s}@keyframes bounce{to{transform:translateY(-30px)}}.message{text-align:center;margin-top:20px;color:#333}.subtext{text-align:center;color:#666;font-size:.9em;margin-top:5px}.placeholder-container{width:25%;text-align:center;margin:10px 0}.placeholder-label{font-weight:700;margin-bottom:5px}.placeholder{background-color:#e0e0e0;padding:10px;border-radius:5px;word-break:break-all;font-family:monospace;cursor:pointer;}</style><div class=loader><div></div><div></div><div></div></div><div class=message><p>Completing challenge ...<div class=subtext>The process is automatic and shouldn't take too long. Please be patient.</div></div><div class=placeholder-container><div class=placeholder-label>publicSalt:</div><div class=placeholder id=publicSalt onclick='ctc("publicSalt")'><span>` + publicSalt + `</span></div></div><div class=placeholder-container><div class=placeholder-label>challenge:</div><div class=placeholder id=challenge onclick='ctc("challenge")'><span>` + hashedEncryptedIP + `</span></div></div><script>function ctc(t){navigator.clipboard.writeText(document.getElementById(t).innerText)}</script><script src="https://cdn.jsdelivr.net/gh/41Baloo/balooPow@main/balooPow.min.js"></script><script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.0.0/crypto-js.min.js"></script><script>let hasMemoryApi=!1,useMemory=!1,hasKnownMemory=!1,startMemory=null,pluginChanged=!1,mimeChanged=!1;function calcSolution(e){let i=0;for(let n=Math.pow(e,7);n>=0;n--)i+=Math.atan(n)*Math.tan(n);return!0}function isMobile(){var e=window.matchMedia||window.msMatchMedia;return!!e&&e("(pointer:coarse)").matches}if(void 0!==performance.memory){hasMemoryApi=!0,startMemory=performance.memory;let{totalJSHeapSize:e,usedJSHeapSize:i,jsHeapSizeLimit:n}=performance.memory;if(([161e5,127e5,1e7,219e4].includes(e)||[161e5,127e5,1e7,219e4].includes(i))&&!isMobile()){for(hasKnownMemory=!0;calcSolution(i);)if(0>performance.now()){hasKnownMemory=!1;break}}}const pluginDescriptor=Object.getOwnPropertyDescriptor(Object.getPrototypeOf(navigator),"plugins"),pluginString=pluginDescriptor.get.toString(),pluginStringsToCheck=["function get plugins() { [native code] }","function plugins() {\n        [native code]\n    }","function plugins() {\n    [native code]\n}"];pluginStringsToCheck.includes(pluginString)||(pluginChanged=!0);const mimeString=pluginDescriptor.get.toString();function solved(e){document.cookie="_2__bProxy_v=` + publicSalt + `"+e.solution+"; SameSite=Lax; path=/; Secure",location.href=location.href}pluginStringsToCheck.includes(mimeString)||(mimeChanged=!0),!mimeChanged&&!pluginChanged&&!useMemory&&!hasKnownMemory&&new BalooPow("` + publicSalt + `",` + strconv.Itoa(domainData.Stage2Difficulty) + `,"` + hashedEncryptedIP + `",!1).Solve().then(e=>{if(e.match){if(hasMemoryApi){let{usedJSHeapSize:i,jsHeapSizeLimit:n,totalJSHeapSize:t}=startMemory;i!==(currentMemory=performance.memory).usedJSHeapSize||n!==currentMemory.jsHeapSizeLimit||t!==currentMemory.totalJSHeapSize||isMobile()?solved(e):alert("Memory Missmatch. Please contact @ddosmitigation")}else solved(e)}else alert("Navigator Missmatch. Please contact @ddosmitigation")});</script>`)
-			return nil
+			writer.Header().Set("Content-Type", "text/html")
+			writer.Header().Set("Cache-Control", "no-store, no-cache, must-revalidate, max-age=0") // Prevent special(ed) browsers from caching the challenge
+			fmt.Fprintf(writer, `<!doctypehtml><html lang=en><meta charset=UTF-8><meta content="width=device-width,initial-scale=1"name=viewport><title>Completing challenge ...</title><style>body,html{height:100%;width:100%;margin:0;display:flex;flex-direction:column;justify-content:center;align-items:center;background-color:#f0f0f0;font-family:Arial,sans-serif}.loader{display:flex;justify-content:space-around;align-items:center;width:100px;height:100px}.loader div{width:20px;height:20px;background-color:#333;border-radius:50%;animation:bounce .6s infinite alternate}.loader div:nth-child(2){animation-delay:.2s}.loader div:nth-child(3){animation-delay:.4s}@keyframes bounce{to{transform:translateY(-30px)}}.message{text-align:center;margin-top:20px;color:#333}.subtext{text-align:center;color:#666;font-size:.9em;margin-top:5px}.placeholder-container{width:25%;text-align:center;margin:10px 0}.placeholder-label{font-weight:700;margin-bottom:5px}.placeholder{background-color:#e0e0e0;padding:10px;border-radius:5px;word-break:break-all;font-family:monospace;cursor:pointer;}</style><div class=loader><div></div><div></div><div></div></div><div class=message><p>Completing challenge ...<div class=subtext>The process is automatic and shouldn't take too long. Please be patient.</div></div><div class=placeholder-container><div class=placeholder-label>publicSalt:</div><div class=placeholder id=publicSalt onclick='ctc("publicSalt")'><span>`+publicSalt+`</span></div></div><div class=placeholder-container><div class=placeholder-label>challenge:</div><div class=placeholder id=challenge onclick='ctc("challenge")'><span>`+hashedEncryptedIP+`</span></div></div><script>function ctc(t){navigator.clipboard.writeText(document.getElementById(t).innerText)}</script><script src="https://cdn.jsdelivr.net/gh/41Baloo/balooPow@main/balooPow.min.js"></script><script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.0.0/crypto-js.min.js"></script><script>let hasMemoryApi=!1,useMemory=!1,hasKnownMemory=!1,startMemory=null,pluginChanged=!1,mimeChanged=!1;function calcSolution(e){let i=0;for(let n=Math.pow(e,7);n>=0;n--)i+=Math.atan(n)*Math.tan(n);return!0}function isMobile(){var e=window.matchMedia||window.msMatchMedia;return!!e&&e("(pointer:coarse)").matches}if(void 0!==performance.memory){hasMemoryApi=!0,startMemory=performance.memory;let{totalJSHeapSize:e,usedJSHeapSize:i,jsHeapSizeLimit:n}=performance.memory;if(([161e5,127e5,1e7,219e4].includes(e)||[161e5,127e5,1e7,219e4].includes(i))&&!isMobile()){for(hasKnownMemory=!0;calcSolution(i);)if(0>performance.now()){hasKnownMemory=!1;break}}}const pluginDescriptor=Object.getOwnPropertyDescriptor(Object.getPrototypeOf(navigator),"plugins"),pluginString=pluginDescriptor.get.toString(),pluginStringsToCheck=["function get plugins() { [native code] }","function plugins() {\n        [native code]\n    }","function plugins() {\n    [native code]\n}"];pluginStringsToCheck.includes(pluginString)||(pluginChanged=!0);const mimeString=pluginDescriptor.get.toString();function solved(e){document.cookie="_2__bProxy_v=`+publicSalt+`"+e.solution+"; SameSite=Lax; path=/; Secure",location.href=location.href}pluginStringsToCheck.includes(mimeString)||(mimeChanged=!0),!mimeChanged&&!pluginChanged&&!useMemory&&!hasKnownMemory&&new BalooPow("`+publicSalt+`",`+strconv.Itoa(domainData.Stage2Difficulty)+`,"`+hashedEncryptedIP+`",!1).Solve().then(e=>{if(e.match){if(hasMemoryApi){let{usedJSHeapSize:i,jsHeapSizeLimit:n,totalJSHeapSize:t}=startMemory;i!==(currentMemory=performance.memory).usedJSHeapSize||n!==currentMemory.jsHeapSizeLimit||t!==currentMemory.totalJSHeapSize||isMobile()?solved(e):alert("Memory Missmatch. Please contact @ddosmitigation")}else solved(e)}else alert("Navigator Missmatch. Please contact @ddosmitigation")});</script>`)
+			return
 		case 3:
 			secretPart := encryptedIP[:6]
 			publicPart := encryptedIP[6:]
@@ -242,8 +246,8 @@ func Middleware(c *fiber.Ctx) error {
 
 				var buf bytes.Buffer
 				if err := png.Encode(&buf, captchaImg); err != nil {
-					c.SendString("BalooProxy Error: Failed to encode captcha: " + err.Error())
-					return nil
+					fmt.Fprintf(writer, "BalooProxy Error: Failed to encode captcha: "+err.Error())
+					return
 				}
 				data := buf.Bytes()
 
@@ -254,9 +258,9 @@ func Middleware(c *fiber.Ctx) error {
 				captchaData = captchaCache.(string)
 			}
 
-			c.Append("Content-Type", "text/html")
-			c.Append("Cache-Control", "no-store, no-cache, must-revalidate, max-age=0") // Prevent special(ed) browsers from caching the challenge
-			c.SendString(`
+			writer.Header().Set("Content-Type", "text/html")
+			writer.Header().Set("Cache-Control", "no-store, no-cache, must-revalidate, max-age=0") // Prevent special(ed) browsers from caching the challenge
+			fmt.Fprintf(writer, `
 			<html>
 			<head>
 				<style>
@@ -408,14 +412,14 @@ padding: 20px;
 			image.onload = function() {
 				ctx.drawImage(image, (canvas.width-image.width)/2, (canvas.height-image.height)/2);
 			};
-			image.src = "data:image/png;base64,` + captchaData + `";
+			image.src = "data:image/png;base64,`+captchaData+`";
 			function checkAnswer(event) {
 				// Prevent the form from being submitted
 				event.preventDefault();
 				// Get the user's input
 				var input = document.getElementById('text').value;
 
-				document.cookie = '` + ip + `_3__bProxy_v='+input+'` + publicPart + `; SameSite=Lax; path=/; Secure';
+				document.cookie = '`+ip+`_3__bProxy_v='+input+'`+publicPart+`; SameSite=Lax; path=/; Secure';
 
 				// Check if the input is correct
 				fetch('https://' + location.hostname + '/_bProxy/verified').then(function(response) {
@@ -480,21 +484,22 @@ padding: 20px;
 			}
 			</script>
 			`)
-			return nil
+			return
 		default:
-			c.SendString("Blocked by BalooProxy.\nSuspicious request of level " + susLvStr)
-			return nil
+			writer.Header().Set("Content-Type", "text/plain")
+			fmt.Fprintf(writer, "Blocked by BalooProxy.\nSuspicious request of level "+susLvStr)
+			return
 		}
 	}
 
 	//Access logs of clients that passed the challenge
 	if browser != "" || botFp != "" {
-		access := "[ " + utils.PrimaryColor(proxy.LastSecondTimeFormated) + " ] > \033[35m" + ip + "\033[0m - \033[32m" + browser + botFp + "\033[0m - " + utils.PrimaryColor(reqUa) + " - " + utils.PrimaryColor(cOURL)
+		access := "[ " + utils.PrimaryColor(proxy.LastSecondTimeFormated) + " ] > \033[35m" + ip + "\033[0m - \033[32m" + browser + botFp + "\033[0m - " + utils.PrimaryColor(reqUa) + " - " + utils.PrimaryColor(request.RequestURI)
 		firewall.Mutex.Lock()
 		domainData = utils.AddLogs(access, domainName)
 		firewall.Mutex.Unlock()
 	} else {
-		access := "[ " + utils.PrimaryColor(proxy.LastSecondTimeFormated) + " ] > \033[35m" + ip + "\033[0m - \033[31mUNK (" + tlsFp + ")\033[0m - " + utils.PrimaryColor(reqUa) + " - " + utils.PrimaryColor(cOURL)
+		access := "[ " + utils.PrimaryColor(proxy.LastSecondTimeFormated) + " ] > \033[35m" + ip + "\033[0m - \033[31mUNK (" + tlsFp + ")\033[0m - " + utils.PrimaryColor(reqUa) + " - " + utils.PrimaryColor(request.RequestURI)
 		firewall.Mutex.Lock()
 		domainData = utils.AddLogs(access, domainName)
 		firewall.Mutex.Unlock()
@@ -508,43 +513,43 @@ padding: 20px;
 
 	//Reserved proxy-paths
 
-	switch cPath {
+	switch request.URL.Path {
 	case "/_bProxy/stats":
-		c.SendString("Stage: " + utils.StageToString(domainData.Stage) + "\nTotal Requests: " + strconv.Itoa(domainData.TotalRequests) + "\nBypassed Requests: " + strconv.Itoa(domainData.BypassedRequests) + "\nTotal R/s: " + strconv.Itoa(domainData.RequestsPerSecond) + "\nBypassed R/s: " + strconv.Itoa(domainData.RequestsBypassedPerSecond) + "\nProxy Fingerprint: " + proxy.Fingerprint)
-		return nil
+		writer.Header().Set("Content-Type", "text/plain")
+		fmt.Fprintf(writer, "Stage: "+utils.StageToString(domainData.Stage)+"\nTotal Requests: "+strconv.Itoa(domainData.TotalRequests)+"\nBypassed Requests: "+strconv.Itoa(domainData.BypassedRequests)+"\nTotal R/s: "+strconv.Itoa(domainData.RequestsPerSecond)+"\nBypassed R/s: "+strconv.Itoa(domainData.RequestsBypassedPerSecond)+"\nProxy Fingerprint: "+proxy.Fingerprint)
+		return
 	case "/_bProxy/fingerprint":
-		c.SendString("IP: " + ip + "\nASN: " + ipInfoASN + "\nCountry: " + ipInfoCountry + "\nIP Requests: " + strconv.Itoa(ipCount) + "\nIP Challenge Requests: " + strconv.Itoa(ipCountCookie) + "\nSusLV: " + strconv.Itoa(susLv) + "\nFingerprint: " + tlsFp + "\nBrowser: " + browser + botFp)
-		return nil
+		writer.Header().Set("Content-Type", "text/plain")
+		fmt.Fprintf(writer, "IP: "+ip+"\nASN: "+ipInfoASN+"\nCountry: "+ipInfoCountry+"\nIP Requests: "+strconv.Itoa(ipCount)+"\nIP Challenge Requests: "+strconv.Itoa(ipCountCookie)+"\nSusLV: "+strconv.Itoa(susLv)+"\nFingerprint: "+tlsFp+"\nBrowser: "+browser+botFp)
+		return
 	case "/_bProxy/verified":
-		c.SendString("verified")
-		return nil
+		writer.Header().Set("Content-Type", "text/plain")
+		fmt.Fprintf(writer, "verified")
+		return
 	case "/_bProxy/" + proxy.AdminSecret + "/api/v1":
-		result := api.Process(c, domainData)
+		result := api.Process(writer, request, domainData)
 		if result {
-			return nil
+			return
 		}
-	case "/_bProxy/" + proxy.AdminSecret + "/monitor":
-		return c.Next()
 
 	//Do not remove or modify this. It is required by the license
 	case "/_bProxy/credits":
-		c.SendString("BalooProxy Lite; Lightweight http reverse-proxy https://github.com/41Baloo/balooProxy. Protected by GNU GENERAL PUBLIC LICENSE Version 2, June 1991")
-		return nil
+		writer.Header().Set("Content-Type", "text/plain")
+		fmt.Fprintf(writer, "BalooProxy; Lightweight http reverse-proxy https://github.com/41Baloo/balooProxy. Protected by GNU GENERAL PUBLIC LICENSE Version 2, June 1991")
+		return
 	}
 
-	_, proxySecretFound := reqHeaders["Proxy-Secret"]
+	// TODO: Implement
+	/*_, proxySecretFound := reqHeaders["Proxy-Secret"]
 	if proxySecretFound {
 		return c.Next() // Return here. This is a v2 api request
-	}
+	}*/
 
 	//Allow backend to read client information
+	request.Header.Add("x-real-ip", ip)
+	request.Header.Add("proxy-real-ip", ip)
+	request.Header.Add("proxy-tls-fp", tlsFp)
+	request.Header.Add("proxy-tls-name", browser+botFp)
 
-	cRequest := c.Request()
-	cRequest.Header.Add("X-Real-IP", ip)
-	cRequest.Header.Add("Proxy-Real-IP", ip)
-	cRequest.Header.Add("Proxy-TLS-FP", tlsFp)
-	cRequest.Header.Add("Proxy-TLS-Name", browser+botFp)
-
-	domainSettings.DomainProxy(c)
-	return nil
+	domainSettings.DomainProxy.ServeHTTP(writer, request)
 }
