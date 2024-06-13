@@ -7,7 +7,6 @@ import (
 	"io"
 	"net/http"
 	"net/url"
-
 	"github.com/boltdb/bolt"
 )
 
@@ -21,9 +20,6 @@ type IPInfo struct {
 }
 
 func CheckAbuseIPDB(IP string, apiKey string) (bool, string) {
-    fmt.Println("Checking IP: " + IP)
-    fmt.Println("Using API Key: " + apiKey)
-
     queryParams := url.Values{}
     queryParams.Add("ipAddress", IP)
     queryParams.Add("maxAgeInDays", "90")
@@ -35,15 +31,16 @@ func CheckAbuseIPDB(IP string, apiKey string) (bool, string) {
     req.Header.Add("Key", apiKey)
     req.Header.Add("Accept", "application/json")
 
-    fmt.Println("Requesting: " + urlStr)
-
     client := &http.Client{}
     resp, err := client.Do(req)
     if err!= nil {
         return false, ""
     }
     defer resp.Body.Close()
-    fmt.Println("Response: " + resp.Status)
+	if resp.StatusCode != 200 {
+		fmt.Println("Error while checking IP: " + IP)
+		return false, ""
+	}
 
     body, _ := io.ReadAll(resp.Body)
     var data map[string]interface{}
