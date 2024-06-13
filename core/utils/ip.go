@@ -6,6 +6,7 @@ import (
 	"goProxy/core/db"
 	"io"
 	"net/http"
+	"net/url"
 
 	"github.com/boltdb/bolt"
 )
@@ -20,12 +21,21 @@ type IPInfo struct {
 }
 
 func CheckAbuseIPDB(IP string, apiKey string) (bool, string) {
-	fmt.Println("Checking IP: " + IP)
-	fmt.Println("Using API Key: " + apiKey)
-    req, _ := http.NewRequest("GET", "https://api.abuseipdb.com/api/v2/check?ipAddress="+IP, nil)
+    fmt.Println("Checking IP: " + IP)
+    fmt.Println("Using API Key: " + apiKey)
+
+    queryParams := url.Values{}
+    queryParams.Add("ipAddress", IP)
+    queryParams.Add("maxAgeInDays", "90")
+    queryParams.Add("verbose", "")
+
+    urlStr := "https://api.abuseipdb.com/api/v2/check?" + queryParams.Encode()
+
+    req, _ := http.NewRequest("GET", urlStr, nil)
     req.Header.Add("Authorization", "Bearer "+apiKey)
-	req.Header.Add("Accept", "application/json")
-	fmt.Println("Requesting: " + "https://api.abuseipdb.com/api/v2/check?ipAddress="+IP)
+    req.Header.Add("Accept", "application/json")
+
+    fmt.Println("Requesting: " + urlStr)
 
     client := &http.Client{}
     resp, err := client.Do(req)
@@ -33,23 +43,16 @@ func CheckAbuseIPDB(IP string, apiKey string) (bool, string) {
         return false, ""
     }
     defer resp.Body.Close()
-	fmt.Println("Response: " + resp.Status)
+    fmt.Println("Response: " + resp.Status)
 
     body, _ := io.ReadAll(resp.Body)
     var data map[string]interface{}
     json.Unmarshal(body, &data)
-	fmt.Println("Data: " + string(body))
-
-    err = json.Unmarshal(body, &data)
-    if err!= nil {
-        return false, ""
-    }
-	fmt.Println("Data: " + string(body))
+    fmt.Println("Data: " + string(body))
 
     if data["data"].(map[string]interface{})["abuseConfidenceScore"].(float64) > 50 {
         return true, data["data"].(map[string]interface{})["abuseConfidenceScore"].(string)
     }
-	fmt.Println("Data: " + string(body))
 
     return false, ""
 }
