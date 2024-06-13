@@ -32,7 +32,7 @@ func CheckAbuseIPDB(IP string, apiKey string) (bool, string) {
     urlStr := "https://api.abuseipdb.com/api/v2/check?" + queryParams.Encode()
 
     req, _ := http.NewRequest("GET", urlStr, nil)
-    req.Header.Add("Authorization", "Bearer "+apiKey)
+    req.Header.Add("Key", apiKey)
     req.Header.Add("Accept", "application/json")
 
     fmt.Println("Requesting: " + urlStr)
