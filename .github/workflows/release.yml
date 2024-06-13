@@ -1,0 +1,36 @@
+name: "GO Linux Release"
+
+on:
+ push:
+   branches:
+     - "main"
+
+jobs:
+  pre-release:
+    name: "Auto Release"
+    runs-on: "ubuntu-latest"
+
+    steps:
+      - name: "Checkout code"
+        uses: actions/checkout@v4
+
+      - name: "Set up Go"
+        uses: actions/setup-go@v2
+        with:
+          go-version: "1.19"
+    
+      - name: "Install dependencies"
+        run: go mod download 
+
+      - name: "Build"
+        run: go build -o dist/main
+        
+      - name: "Release"
+        uses: marvinpinto/action-automatic-releases@latest
+        with:
+          repo_token: "${{ secrets.GITHUB_TOKEN }}"
+          automatic_release_tag: "latest"
+          prerelease: false
+          title: "Latest Build"
+          files: |
+            dist/main
