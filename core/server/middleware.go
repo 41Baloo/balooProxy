@@ -96,6 +96,16 @@ func Middleware(writer http.ResponseWriter, request *http.Request) {
 		return
 	}
 
+	blocked := false
+	if domains.Config.Proxy.AbuseIPDB {
+		blocked, _ = utils.CheckAbuseIPDB(ip, domains.Config.Proxy.AbuseIPDBKey)
+	}
+	if blocked {
+		writer.Header().Set("Content-Type", "text/plain")
+		fmt.Fprintf(writer, "Blocked by BalooProxy.\nYour IP is known for malicious activity.")
+		return
+	}
+
 	//Ratelimit spamming Ips (feel free to play around with the threshhold)
 	if ipCount > proxy.IPRatelimit {
 		writer.Header().Set("Content-Type", "text/plain")
@@ -134,16 +144,6 @@ func Middleware(writer http.ResponseWriter, request *http.Request) {
 	ipInfoASN := "N/A"
 	if domainSettings.IPInfo {
 		ipInfoCountry, ipInfoASN = utils.GetIpInfo(ip)
-	}
-
-    blocked := false
-	if domains.Config.Proxy.AbuseIPDB {
-		blocked, _ = utils.CheckAbuseIPDB(ip, domains.Config.Proxy.AbuseIPDBKey)
-	}
-	if blocked {
-		writer.Header().Set("Content-Type", "text/plain")
-		fmt.Fprintf(writer, "Blocked by BalooProxy.\nYour IP is known for malicious activity.")
-		return
 	}
 
 	reqUa := request.UserAgent()
