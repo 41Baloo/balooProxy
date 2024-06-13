@@ -48,7 +48,12 @@ To start, download the [latest version of balooProxy](https://github.com/41Baloo
 
 If you already have a `config.json` drag it in the same folder in your server as the `main` you downloaded/compiled. If you do not, simply start balooProxy by running `./main` and answer the questions the proxy asks you. After you answered those questions stop the proxy with `ctrl + c`.
 
+# **Running**
 You can run the proxy as a [service](https://abhinand05.medium.com/run-any-executable-as-systemd-service-in-linux-21298674f66f) or inside of a screen. To run the proxy inside a screen on ubuntu/debian first run `apt update`. After that is done install screen by running `apt install screen` and follow its installation process. To start running the proxy inside of a screen run `screen -S balooProxy`. This will put you inside a screen, making sure the proxy keeps running even when you log out of ssh. Now just start the proxy inside the screen by running `./main` (make sure the proxy isnt running anywhere else already) and quit the screen by pressing `ctrl + a + d`. You can always reopen the screen by running `screen -d -r`
+
+# **Docker Setup**
+To use balooProxy with Docker, start by executing the `./main` file to generate a config.json. Next, build the Docker image by running `docker build -t baloo-proxy .` in the same folder as the main file. Once the build is complete, run the Docker image using `docker run -d -p 80:80 -p 443:443 -t baloo-proxy`. To access the terminal of the Docker image, use `docker attach CONTAINERID`.
+The container ID can be obtained by running `docker ps`. To detach from the terminal, press `Ctrl + p + q`. To stop the container, run `docker stop CONTAINERID`. To remove the container, use `docker rm CONTAINERID`, and to remove the image, run `docker rmi baloo-proxy`.
 
 ## **DNS Setup**
 
