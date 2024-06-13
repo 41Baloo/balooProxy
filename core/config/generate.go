@@ -22,6 +22,8 @@ func Generate() {
 			Cloudflare:  utils.AskBool("Use This Proxy With Cloudflare? (y/N)", false),
 			AdminSecret: utils.RandomString(25),
 			APISecret:   utils.RandomString(30),
+			AbuseIPDB:   utils.AskBool("Use AbuseIPDB To Check For Malicious IPs? (y/N)", false),
+			AbuseIPDBKey: utils.AskString("What Is Your AbuseIPDB API Key? (Leave Empty If You Do Not Want To Use AbuseIPDB)", ""),
 			Timeout: domains.TimeoutSettings{
 				Idle:       utils.AskInt("How Many Seconds Should An Indle Connection Be Kept Open?", 3),
 				Read:       utils.AskInt("How Many Seconds Should A Reading Connection Be Kept Open?", 5),

@@ -136,6 +136,16 @@ func Middleware(writer http.ResponseWriter, request *http.Request) {
 		ipInfoCountry, ipInfoASN = utils.GetIpInfo(ip)
 	}
 
+    blocked := false
+	if domains.Config.Proxy.AbuseIPDB {
+		blocked, _ = utils.CheckAbuseIPDB(ip, domains.Config.Proxy.AbuseIPDBKey)
+	}
+	if blocked {
+		writer.Header().Set("Content-Type", "text/plain")
+		fmt.Fprintf(writer, "Blocked by BalooProxy.\nYour IP is known for malicious activity.")
+		return
+	}
+
 	reqUa := request.UserAgent()
 
 	requestVariables := gofilter.Message{

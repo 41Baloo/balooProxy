@@ -4,6 +4,8 @@
         "maxLogLength": 5,
         "adminsecret": "CHANGE_ME",
         "apisecret": "CHANGE_ME",
+        "abuseipdb": false,
+        "abuseipdbkey": "CHANGE_ME",
         "secrets": {
             "captcha": "CHANG_ME1",
             "cookie": "CHANG_ME2",

@@ -18,6 +18,33 @@ type IPInfo struct {
 	} `json:"as"`
 }
 
+func CheckAbuseIPDB(IP string, apiKey string) (bool, string) {
+    req, _ := http.NewRequest("GET", "https://api.abuseipdb.com/api/v2/check?ipAddress="+IP, nil)
+    req.Header.Add("Authorization", "Bearer "+apiKey)
+
+    client := &http.Client{}
+    resp, err := client.Do(req)
+    if err!= nil {
+        return false, ""
+    }
+    defer resp.Body.Close()
+
+    body, _ := io.ReadAll(resp.Body)
+    var data map[string]interface{}
+    json.Unmarshal(body, &data)
+
+    err = json.Unmarshal(body, &data)
+    if err!= nil {
+        return false, ""
+    }
+
+    if data["data"].(map[string]interface{})["abuseConfidenceScore"].(float64) > 50 {
+        return true, data["data"].(map[string]interface{})["abuseConfidenceScore"].(string)
+    }
+
+    return false, ""
+}
+
 func GetIpInfo(IP string) (country string, asn string) {
 
 	var ipCountry []byte

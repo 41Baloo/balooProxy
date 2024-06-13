@@ -87,6 +87,8 @@ type Proxy struct {
 	AdminSecret  string            `json:"adminsecret"`
 	APISecret    string            `json:"apisecret"`
 	Secrets      map[string]string `json:"secrets"`
+	AbuseIPDB    bool              `json:"abuseipdb"`
+	AbuseIPDBKey string            `json:"abuseipdbkey"`
 	Timeout      TimeoutSettings   `json:"timeout"`
 	Ratelimits   map[string]int    `json:"ratelimits"`
 }
