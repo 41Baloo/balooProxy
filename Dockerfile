@@ -13,3 +13,4 @@ RUN go build -o main .
 EXPOSE 80 443
 
 CMD ["./main"]
+#CMD ["/bin/sh", "-c", "./main & exec sh"]
