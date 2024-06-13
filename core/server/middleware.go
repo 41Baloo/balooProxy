@@ -98,9 +98,11 @@ func Middleware(writer http.ResponseWriter, request *http.Request) {
 
 	blocked := false
 	if domains.Config.Proxy.AbuseIPDB {
+		fmt.Println("Checking IP: " + ip)
 		blocked, _ = utils.CheckAbuseIPDB(ip, domains.Config.Proxy.AbuseIPDBKey)
 	}
 	if blocked {
+		fmt.Println("Blocked IP: " + ip)
 		writer.Header().Set("Content-Type", "text/plain")
 		fmt.Fprintf(writer, "Blocked by BalooProxy.\nYour IP is known for malicious activity.")
 		return
