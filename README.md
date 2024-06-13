@@ -93,6 +93,9 @@ This field allows you to set the different ratelimit values
 
 **`noRequestsSent`**: Amount of times a single ip can open a tcp connection without making http requests
 
+**`abuseipdb`**: Can be enabled with true or disabled with false.
+**`abuseipdbKey`**: AbuseIPDB API key. You can get one [here](https://www.abuseipdb.com/register)
+
 ### **Domains**
 ---
 
