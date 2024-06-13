@@ -10,7 +10,6 @@ COPY . .
 
 RUN go build -o main .
 
-EXPOSE 80
-EXPOSE 443
+EXPOSE 80 443
 
 CMD ["./main"]
