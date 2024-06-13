@@ -1,9 +1,9 @@
 name: "GO Linux Release"
 
 on:
- push:
-   branches:
-     - "main"
+  push:
+    branches:
+      - "main"
 
 jobs:
   pre-release:
@@ -18,19 +18,27 @@ jobs:
         uses: actions/setup-go@v2
         with:
           go-version: "1.19"
-    
-      - name: "Install dependencies"
-        run: go mod download 
 
-      - name: "Build"
-        run: go build -o dist/main
-        
+      - name: "Install dependencies"
+        run: go mod download
+
+      - name: "Generate random UUID"
+        id: uuid
+        run: echo "uuid=$(uuidgen)" >> $GITHUB_ENV
+
+      - name: "Build with UUID"
+        run: go build -ldflags "-X 'main.Fingerprint=${{ env.uuid }}'" -o dist/main
+
       - name: "Release"
         uses: marvinpinto/action-automatic-releases@latest
         with:
           repo_token: "${{ secrets.GITHUB_TOKEN }}"
           automatic_release_tag: "latest"
-          prerelease: false
-          title: "Latest Build"
+          prerelease: true
+          draft: true
+          title: "Latest Build (${{ env.uuid }})"
           files: |
             dist/main
+          body: |
+            This is an unstable build.
+            Release Tag: ${{ env.uuid }}
