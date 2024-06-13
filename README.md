@@ -53,7 +53,7 @@ You can run the proxy as a [service](https://abhinand05.medium.com/run-any-execu
 
 # **Docker Setup**
 To use balooProxy with Docker, start by executing the `./main` file to generate a config.json. Next, build the Docker image by running `docker build -t baloo-proxy .` in the same folder as the main file. Once the build is complete, run the Docker image using `docker run -d -p 80:80 -p 443:443 -t baloo-proxy`. To access the terminal of the Docker image, use `docker attach CONTAINERID`.
-You get the container id by running `docker ps`. To detach from the terminal press `ctrl + p + q`. To stop the container run `docker stop CONTAINERID`. To remove the container run `docker rm CONTAINERID`. To remove the image run `docker rmi baloo-proxy
+The container ID can be obtained by running `docker ps`. To detach from the terminal, press `Ctrl + p + q`. To stop the container, run `docker stop CONTAINERID`. To remove the container, use `docker rm CONTAINERID`, and to remove the image, run `docker rmi baloo-proxy`.
 
 ## **DNS Setup**
 
