@@ -21,6 +21,7 @@ type IPInfo struct {
 
 func CheckAbuseIPDB(IP string, apiKey string) (bool, string) {
 	fmt.Println("Checking IP: " + IP)
+	fmt.Println("Using API Key: " + apiKey)
     req, _ := http.NewRequest("GET", "https://api.abuseipdb.com/api/v2/check?ipAddress="+IP, nil)
     req.Header.Add("Authorization", "Bearer "+apiKey)
 	req.Header.Add("Accept", "application/json")
