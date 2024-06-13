@@ -2,6 +2,7 @@ package utils
 
 import (
 	"encoding/json"
+	"fmt"
 	"goProxy/core/db"
 	"io"
 	"net/http"
@@ -19,8 +20,11 @@ type IPInfo struct {
 }
 
 func CheckAbuseIPDB(IP string, apiKey string) (bool, string) {
+	fmt.Println("Checking IP: " + IP)
     req, _ := http.NewRequest("GET", "https://api.abuseipdb.com/api/v2/check?ipAddress="+IP, nil)
     req.Header.Add("Authorization", "Bearer "+apiKey)
+	req.Header.Add("Accept", "application/json")
+	fmt.Println("Requesting: " + "https://api.abuseipdb.com/api/v2/check?ipAddress="+IP)
 
     client := &http.Client{}
     resp, err := client.Do(req)
@@ -28,19 +32,23 @@ func CheckAbuseIPDB(IP string, apiKey string) (bool, string) {
         return false, ""
     }
     defer resp.Body.Close()
+	fmt.Println("Response: " + resp.Status)
 
     body, _ := io.ReadAll(resp.Body)
     var data map[string]interface{}
     json.Unmarshal(body, &data)
+	fmt.Println("Data: " + string(body))
 
     err = json.Unmarshal(body, &data)
     if err!= nil {
         return false, ""
     }
+	fmt.Println("Data: " + string(body))
 
     if data["data"].(map[string]interface{})["abuseConfidenceScore"].(float64) > 50 {
         return true, data["data"].(map[string]interface{})["abuseConfidenceScore"].(string)
     }
+	fmt.Println("Data: " + string(body))
 
     return false, ""
 }
