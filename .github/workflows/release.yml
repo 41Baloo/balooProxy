@@ -35,7 +35,6 @@ jobs:
           repo_token: "${{ secrets.GITHUB_TOKEN }}"
           automatic_release_tag: "latest"
           prerelease: true
-          draft: true
           title: "Latest Build (${{ env.uuid }})"
           files: |
             dist/main
