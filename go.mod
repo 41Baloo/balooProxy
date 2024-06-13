@@ -12,6 +12,8 @@ require (
 require (
 	github.com/klauspost/cpuid/v2 v2.2.8 // indirect
 	github.com/stretchr/testify v1.8.1 // indirect
+	golang.org/x/net v0.26.0 // indirect
+	golang.org/x/text v0.16.0 // indirect
 )
 
 require (

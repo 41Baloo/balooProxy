@@ -15,10 +15,17 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"golang.org/x/net/http2"
 )
 
 var (
 	transportMap = sync.Map{}
+	bufferPool   = sync.Pool{
+		New: func() interface{} {
+			return &bytes.Buffer{}
+		},
+	}
 )
 
 func Serve() {
@@ -36,6 +43,7 @@ func Serve() {
 			MaxHeaderBytes:    1 << 20,
 		}
 
+		http2.ConfigureServer(service, &http2.Server{})
 		service.SetKeepAlivesEnabled(true)
 		service.Handler = http.HandlerFunc(Middleware)
 
@@ -67,6 +75,9 @@ func Serve() {
 			},
 			MaxHeaderBytes: 1 << 20,
 		}
+
+		http2.ConfigureServer(service, &http2.Server{})
+		http2.ConfigureServer(serviceH, &http2.Server{})
 
 		service.Handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			firewall.Mutex.RLock()
@@ -104,13 +115,6 @@ func Serve() {
 	}
 }
 
-// this should be more performant and reduce memory allocations
-var bufferPool = sync.Pool{
-	New: func() interface{} {
-		return &bytes.Buffer{}
-	},
-}
-
 func (rt *RoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
 
 	buffer := bufferPool.Get().(*bytes.Buffer)
@@ -133,7 +137,6 @@ func (rt *RoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
 			}
 		}
 
-		buffer.Reset()
 		buffer.WriteString(`<!DOCTYPE html><html><head><title>Error: `)
 		buffer.WriteString(errMsg) // Page Title
 		buffer.WriteString(`</title><style>body{font-family:'Helvetica Neue',sans-serif;color:#333;margin:0;padding:0}.container{display:flex;align-items:center;justify-content:center;height:100vh;background:#fafafa}.error-box{width:600px;padding:20px;background:#fff;border-radius:5px;box-shadow:0 2px 4px rgba(0,0,0,.1)}.error-box h1{font-size:36px;margin-bottom:20px}.error-box p{font-size:16px;line-height:1.5;margin-bottom:20px}.error-box p.description{font-style:italic;color:#666}.error-box a{display:inline-block;padding:10px 20px;background:#00b8d4;color:#fff;border-radius:5px;text-decoration:none;font-size:16px}</style><div class=container><div class=error-box><h1>Error: `)
@@ -165,7 +168,6 @@ func (rt *RoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
 
 		if errErr == nil && len(errBody) != 0 {
 
-			buffer.Reset()
 			buffer.WriteString(`<!DOCTYPE html><html><head><title>Error: `)
 			buffer.WriteString(resp.Status)
 			buffer.WriteString(`</title><style>body{font-family:'Helvetica Neue',sans-serif;color:#333;margin:0;padding:0}.container{display:flex;align-items:center;justify-content:center;height:100vh;background:#fafafa}.error-box{width:600px;padding:20px;background:#fff;border-radius:5px;box-shadow:0 2px 4px rgba(0,0,0,.1)}.error-box h1{font-size:36px;margin-bottom:20px}.error-box p{font-size:16px;line-height:1.5;margin-bottom:20px}.error-box p.description{font-style:italic;color:#666}.error-box a{display:inline-block;padding:10px 20px;background:#00b8d4;color:#fff;border-radius:5px;text-decoration:none;font-size:16px}</style><div class=container><div class=error-box><h1>Error:`)
@@ -175,7 +177,6 @@ func (rt *RoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
 
 		} else {
 
-			buffer.Reset()
 			buffer.WriteString(`<!DOCTYPE html><html><head><title>Error: `)
 			buffer.WriteString(resp.Status)
 			buffer.WriteString(`</title><style>body{font-family:'Helvetica Neue',sans-serif;color:#333;margin:0;padding:0}.container{display:flex;align-items:center;justify-content:center;height:100vh;background:#fafafa}.error-box{width:600px;padding:20px;background:#fff;border-radius:5px;box-shadow:0 2px 4px rgba(0,0,0,.1)}.error-box h1{font-size:36px;margin-bottom:20px}.error-box p{font-size:16px;line-height:1.5;margin-bottom:20px}.error-box p.description{font-style:italic;color:#666}.error-box a{display:inline-block;padding:10px 20px;background:#00b8d4;color:#fff;border-radius:5px;text-decoration:none;font-size:16px}</style><div class=container><div class=error-box><h1>`)
@@ -194,25 +195,27 @@ func (rt *RoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
 	return resp, nil
 }
 
+var defaultTransport = &http.Transport{
+	DialContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
+		return (&net.Dialer{
+			Timeout:   5 * time.Second,
+			KeepAlive: 30 * time.Second,
+		}).DialContext(ctx, network, addr)
+	},
+	TLSHandshakeTimeout: 10 * time.Second,
+	TLSClientConfig:     &tls.Config{InsecureSkipVerify: true},
+	IdleConnTimeout:     90 * time.Second,
+	MaxIdleConns:        10,
+	MaxConnsPerHost:     10,
+}
+
 func getTripperForDomain(domain string) *http.Transport {
 
 	transport, ok := transportMap.Load(domain)
-	if ok {
-		return transport.(*http.Transport)
-	} else {
-		transport := &http.Transport{
-			DialContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
-				return (&net.Dialer{
-					Timeout: 5 * time.Second,
-				}).DialContext(ctx, network, addr)
-			},
-			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
-			IdleConnTimeout: 90 * time.Second,
-			MaxIdleConns:    10,
-		}
-		racedTransport, _ := transportMap.LoadOrStore(domain, transport)
-		return racedTransport.(*http.Transport)
+	if !ok {
+		transport, _ = transportMap.LoadOrStore(domain, defaultTransport)
 	}
+	return transport.(*http.Transport)
 }
 
 type RoundTripper struct {
