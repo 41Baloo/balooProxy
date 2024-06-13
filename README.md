@@ -48,8 +48,14 @@ To start, download the [latest version of balooProxy](https://github.com/41Baloo
 
 If you already have a `config.json` drag it in the same folder in your server as the `main` you downloaded/compiled. If you do not, simply start balooProxy by running `./main` and answer the questions the proxy asks you. After you answered those questions stop the proxy with `ctrl + c`.
 
+# **Running**
 You can run the proxy as a [service](https://abhinand05.medium.com/run-any-executable-as-systemd-service-in-linux-21298674f66f) or inside of a screen. To run the proxy inside a screen on ubuntu/debian first run `apt update`. After that is done install screen by running `apt install screen` and follow its installation process. To start running the proxy inside of a screen run `screen -S balooProxy`. This will put you inside a screen, making sure the proxy keeps running even when you log out of ssh. Now just start the proxy inside the screen by running `./main` (make sure the proxy isnt running anywhere else already) and quit the screen by pressing `ctrl + a + d`. You can always reopen the screen by running `screen -d -r`
 
+# **Docker Setup**
+You can use balooProxy with docker aswell. To do first execute the ./main file to generate a config.json. Then build the docker image by running `docker build -t baloo-proxy .` in the same folder as the main file. After that is done you can run the docker image by running `docker run -d -p 80:80 -p 443:443 -t baloo-proxy`. To access the terminal of the docker image run `docker attach CONTAINERID`.
+You get the container id by running `docker ps`. To detach from the terminal press `ctrl + p + q`. To stop the container run `docker stop CONTAINERID`. To remove the container run `docker rm CONTAINERID`. To remove the image run `docker rmi baloo-proxy
+
+```Dockerfile
 ## **DNS Setup**
 
 The proxy is now successfully running, however you still need to point your dns records to the proxy. To do so get the servers ip the proxy is currently running on. Go to your dns management and point the domain you want to proxy to the proxy ip via an `A` record, if the ip is an ipv4 or an `AAAA` record, if the ip is an ipv6. If you chose to use the proxy with Cloudflare, make sure the option "`Proxy status`" is set to "`Proxied`". If you chose not to use Cloudflare but are managing the dns via Cloudflare, make sure "`Proxy status`" is set to "`DNS only`". Also make sure no other records are pointing to your actual backend, since the proxy can otherwise be bypassed by attacking the backend directly, without first going through the proxy. After you did all of that wait ~10 minutes for the dns entry to register. You can check if your domain is successfully proxied by opening a new tab in the browser of your choice, opening dev tools, navigating to the network tab, opening your website, and searching for a "`baloo-proxy`" header in "Response Headers" of your request. If that exist, you successfully setup balooProxy
