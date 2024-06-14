@@ -148,46 +148,45 @@ func handleDomainActions(action string, writer http.ResponseWriter, domainData *
 	}
 }
 
-func CreateAPIRoutes() {
+func ProcessV2(w http.ResponseWriter, r *http.Request) bool {
 
-	http.HandleFunc("/_bProxy/api/v2/", func(w http.ResponseWriter, r *http.Request) {
-		if r.Header.Get("Proxy-Secret") != proxy.APISecret {
-			return
+	if r.Header.Get("Proxy-Secret") != proxy.APISecret {
+		return false
+	}
+
+	path := strings.TrimPrefix(r.URL.Path, "/_bProxy/api/v2/")
+	parts := strings.Split(path, "/")
+
+	if len(parts) == 0 || (len(parts) == 1 && parts[0] == "") {
+		return false
+	}
+
+	if len(parts) == 1 {
+
+		// /:action
+
+		handleProxyActions(parts[0], w)
+		return true
+	} else {
+
+		//  /:domain/:action
+
+		uncastedDomainSettingsdomain, ok := domains.DomainsMap.Load(parts[0])
+		if !ok {
+			APIResponse(w, false, map[string]interface{}{
+				"ERROR": ERR_DOMAIN_NOT_FOUND,
+			})
+			return true
 		}
+		domainSettingsdomain, _ := uncastedDomainSettingsdomain.(domains.DomainSettings)
 
-		path := strings.TrimPrefix(r.URL.Path, "/_bProxy/api/v2/")
-		parts := strings.Split(path, "/")
+		firewall.Mutex.RLock()
+		domainData := domains.DomainsData[parts[0]]
+		firewall.Mutex.RUnlock()
 
-		if len(parts) == 0 || (len(parts) == 1 && parts[0] == "") {
-			http.Error(w, "Bad Request", http.StatusBadRequest)
-			return
-		}
-
-		if len(parts) == 1 {
-
-			// /:action
-
-			handleProxyActions(parts[0], w)
-		} else {
-
-			//  /:domain/:action
-
-			uncastedDomainSettingsdomain, ok := domains.DomainsMap.Load(parts[0])
-			if !ok {
-				APIResponse(w, false, map[string]interface{}{
-					"ERROR": ERR_DOMAIN_NOT_FOUND,
-				})
-				return
-			}
-			domainSettingsdomain, _ := uncastedDomainSettingsdomain.(domains.DomainSettings)
-
-			firewall.Mutex.RLock()
-			domainData := domains.DomainsData[parts[0]]
-			firewall.Mutex.RUnlock()
-
-			handleDomainActions(parts[1], w, &domainData, &domainSettingsdomain)
-		}
-	})
+		handleDomainActions(parts[1], w, &domainData, &domainSettingsdomain)
+		return true
+	}
 }
 
 func APIResponse(writer http.ResponseWriter, success bool, response map[string]interface{}) error {

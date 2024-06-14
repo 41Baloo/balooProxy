@@ -324,11 +324,12 @@ func Middleware(writer http.ResponseWriter, request *http.Request) {
 		return
 	}
 
-	// TODO: Implement
-	/*_, proxySecretFound := reqHeaders["Proxy-Secret"]
-	if proxySecretFound {
-		return c.Next() // Return here. This is a v2 api request
-	}*/
+	if strings.HasPrefix(request.URL.Path, "/_bProxy/api/v2") {
+		result := api.ProcessV2(writer, request)
+		if result {
+			return
+		}
+	}
 
 	//Allow backend to read client information
 	request.Header.Add("x-real-ip", ip)
