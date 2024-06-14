@@ -4,7 +4,6 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"math/rand"
-	"time"
 
 	"github.com/zeebo/blake3"
 )
@@ -29,7 +28,6 @@ func EncryptSha(input string, key string) string {
 }
 
 func RandomString(length int) string {
-	rand.Seed(time.Now().UnixNano())
 	var rnd = []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789")
 
 	res := make([]rune, length)

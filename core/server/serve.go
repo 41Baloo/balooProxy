@@ -9,14 +9,23 @@ import (
 	"goProxy/core/firewall"
 	"goProxy/core/pnc"
 	"goProxy/core/proxy"
-	"goProxy/core/utils"
 	"io"
 	"net"
 	"net/http"
 	"strings"
+	"sync"
 	"time"
 
-	"github.com/kor44/gofilter"
+	"golang.org/x/net/http2"
+)
+
+var (
+	transportMap = sync.Map{}
+	bufferPool   = sync.Pool{
+		New: func() interface{} {
+			return &bytes.Buffer{}
+		},
+	}
 )
 
 func Serve() {
@@ -24,6 +33,7 @@ func Serve() {
 	defer pnc.PanicHndl()
 
 	if domains.Config.Proxy.Cloudflare {
+
 		service := &http.Server{
 			IdleTimeout:       proxy.IdleTimeoutDuration,
 			ReadTimeout:       proxy.ReadTimeoutDuration,
@@ -33,6 +43,7 @@ func Serve() {
 			MaxHeaderBytes:    1 << 20,
 		}
 
+		http2.ConfigureServer(service, &http2.Server{})
 		service.SetKeepAlivesEnabled(true)
 		service.Handler = http.HandlerFunc(Middleware)
 
@@ -40,6 +51,7 @@ func Serve() {
 			panic(err)
 		}
 	} else {
+
 		service := &http.Server{
 			IdleTimeout:       proxy.IdleTimeoutDuration,
 			ReadTimeout:       proxy.ReadTimeoutDuration,
@@ -64,12 +76,15 @@ func Serve() {
 			MaxHeaderBytes: 1 << 20,
 		}
 
-		service.Handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			firewall.Mutex.Lock()
-			domainData := domains.DomainsData[r.Host]
-			firewall.Mutex.Unlock()
+		http2.ConfigureServer(service, &http2.Server{})
+		http2.ConfigureServer(serviceH, &http2.Server{})
 
-			if domainData.Stage == 0 {
+		service.Handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			firewall.Mutex.RLock()
+			domainData, domainFound := domains.DomainsData[r.Host]
+			firewall.Mutex.RUnlock()
+
+			if !domainFound {
 				w.Header().Set("Content-Type", "text/plain")
 				fmt.Fprintf(w, "balooProxy: "+r.Host+" does not exist. If you are the owner please check your config.json if you believe this is a mistake")
 				return
@@ -83,7 +98,6 @@ func Serve() {
 
 			http.Redirect(w, r, "https://"+r.Host+r.URL.Path+r.URL.RawQuery, http.StatusMovedPermanently)
 		})
-		//service.SetKeepAlivesEnabled(false)
 
 		service.SetKeepAlivesEnabled(true)
 		serviceH.Handler = http.HandlerFunc(Middleware)
@@ -103,74 +117,12 @@ func Serve() {
 
 func (rt *RoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
 
-	cacheRes := 0
-	reqIP := ""
-
-	if req.Method != "POST" && proxy.CacheEnabled {
-
-		domainSettings := req.Context().Value("domain").(domains.DomainSettings)
-		messages := req.Context().Value("filter").(gofilter.Message)
-
-		cacheRes = evalCache(domainSettings, messages)
-
-		if cacheRes != 0 {
-			var cacheResponse any
-			cacheOk := false
-			cacheKey := ""
-
-			switch cacheRes {
-			case proxy.CACHE_DEFAULT:
-				cacheKey = req.Host + req.URL.Path + req.URL.RawQuery + req.Method
-			case proxy.CACHE_DEFAULT_STRICT:
-				cacheKey = req.Host + req.URL.Path + req.URL.RawQuery
-			case proxy.CACHE_CAREFUL:
-				reqIP = strings.Split(req.RemoteAddr, ":")[0]
-				cacheKey = req.Host + reqIP + req.URL.Path + req.URL.RawQuery + req.Method
-			case proxy.CACHE_CAREFUL_STRICT:
-				reqIP = strings.Split(req.RemoteAddr, ":")[0]
-				cacheKey = req.Host + reqIP + req.URL.Path + req.URL.RawQuery
-			case proxy.CACHE_IGNORE_QUERY:
-				cacheKey = req.Host + req.URL.Path
-			case proxy.CACHE_QUERY:
-				cacheKey = req.Host + req.URL.RawQuery
-			case proxy.CACHE_CLIENTIP:
-				reqIP = strings.Split(req.RemoteAddr, ":")[0]
-				cacheKey = req.Host + reqIP
-			default:
-			}
-
-			cacheResponse, cacheOk = domains.DomainsCache.Load(cacheKey)
-
-			if cacheOk {
-				cachedResp := cacheResponse.(domains.CacheResponse)
-
-				//Check if cache is expired
-				if cachedResp.Timestamp > int(proxy.LastSecondTime.Unix()) {
-
-					resp := &http.Response{
-						StatusCode: cachedResp.Status,
-						Header:     cachedResp.Headers,
-						Body:       io.NopCloser(bytes.NewReader(cachedResp.Body)),
-					}
-
-					resp.Header.Set("proxy-cache", "HIT")
-					return resp, nil
-				}
-
-				domains.DomainsCache.Delete(req.Host + req.URL.Path + req.URL.RawQuery)
-			}
-		}
-	}
+	buffer := bufferPool.Get().(*bytes.Buffer)
+	buffer.Reset()
+	defer bufferPool.Put(buffer)
 
 	//Use Proxy Read Timeout
-	transport := &http.Transport{
-		DialContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
-			return (&net.Dialer{
-				Timeout: 5 * time.Second,
-			}).DialContext(ctx, network, addr)
-		},
-		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
-	}
+	transport := getTripperForDomain(req.Host)
 
 	//Use inbuild RoundTrip
 	resp, err := transport.RoundTrip(req)
@@ -184,288 +136,86 @@ func (rt *RoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
 				errMsg += str + " "
 			}
 		}
-		errPage := `
-			<!DOCTYPE html>
-			<html>
-			<head>
-			<title>Error: ` + errMsg + `</title>
-			<style>
-				body {
-				font-family: 'Helvetica Neue', sans-serif;
-				color: #333;
-				margin: 0;
-				padding: 0;
-				}
-				.container {
-				display: flex;
-				align-items: center;
-				justify-content: center;
-				height: 100vh;
-				background: #fafafa;
-				}
-				.error-box {
-				width: 600px;
-				padding: 20px;
-				background: #fff;
-				border-radius: 5px;
-				box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-				}
-				.error-box h1 {
-				font-size: 36px;
-				margin-bottom: 20px;
-				}
-				.error-box p {
-				font-size: 16px;
-				line-height: 1.5;
-				margin-bottom: 20px;
-				}
-				.error-box p.description {
-				font-style: italic;
-				color: #666;
-				}
-				.error-box a {
-				display: inline-block;
-				padding: 10px 20px;
-				background: #00b8d4;
-				color: #fff;
-				border-radius: 5px;
-				text-decoration: none;
-				font-size: 16px;
-				}
-			</style>
-			</head>
-			<body>
-			<div class="container">
-				<div class="error-box">
-				<h1>Error: ` + errMsg + `</h1>
-				<p>Sorry, there was an error connecting to the backend. That's all we know.</p>
-				<a onclick="location.reload()">Reload page</a>
-				</div>
-			</div>
-			</body>
-			</html>
-		`
+
+		buffer.WriteString(`<!DOCTYPE html><html><head><title>Error: `)
+		buffer.WriteString(errMsg) // Page Title
+		buffer.WriteString(`</title><style>body{font-family:'Helvetica Neue',sans-serif;color:#333;margin:0;padding:0}.container{display:flex;align-items:center;justify-content:center;height:100vh;background:#fafafa}.error-box{width:600px;padding:20px;background:#fff;border-radius:5px;box-shadow:0 2px 4px rgba(0,0,0,.1)}.error-box h1{font-size:36px;margin-bottom:20px}.error-box p{font-size:16px;line-height:1.5;margin-bottom:20px}.error-box p.description{font-style:italic;color:#666}.error-box a{display:inline-block;padding:10px 20px;background:#00b8d4;color:#fff;border-radius:5px;text-decoration:none;font-size:16px}</style><div class=container><div class=error-box><h1>Error: `)
+		buffer.WriteString(errMsg) // Page Body
+		buffer.WriteString(`</h1><p>Sorry, there was an error connecting to the backend. That's all we know.</p><a onclick="location.reload()">Reload page</a></div></div></body></html>`)
 
 		return &http.Response{
 			StatusCode: http.StatusOK,
-			Body:       io.NopCloser(strings.NewReader(errPage)),
+			Body:       io.NopCloser(bytes.NewReader(buffer.Bytes())),
 		}, nil
 	}
 
 	//Connection was successfull, got bad response tho
 	if resp.StatusCode > 499 && resp.StatusCode < 600 {
 
-		errPage := `
-			<!DOCTYPE html>
-			<html>
-			<head>
-			<title>Error: ` + resp.Status + `</title>
-			<style>
-				body {
-				font-family: 'Helvetica Neue', sans-serif;
-				color: #333;
-				margin: 0;
-				padding: 0;
-				}
-				.container {
-				display: flex;
-				align-items: center;
-				justify-content: center;
-				height: 100vh;
-				background: #fafafa;
-				}
-				.error-box {
-				width: 600px;
-				padding: 20px;
-				background: #fff;
-				border-radius: 5px;
-				box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-				}
-				.error-box h1 {
-				font-size: 36px;
-				margin-bottom: 20px;
-				}
-				.error-box p {
-				font-size: 16px;
-				line-height: 1.5;
-				margin-bottom: 20px;
-				}
-				.error-box p.description {
-				font-style: italic;
-				color: #666;
-				}
-				.error-box a {
-				display: inline-block;
-				padding: 10px 20px;
-				background: #00b8d4;
-				color: #fff;
-				border-radius: 5px;
-				text-decoration: none;
-				font-size: 16px;
-				}
-			</style>
-			</head>
-			<body>
-			<div class="container">
-				<div class="error-box">
-				<h1>Error: ` + resp.Status + `</h1>
-				<p>Sorry, the backend returned an error. That's all we know.</p>
-				<a onclick="location.reload()">Reload page</a>
-				</div>
-			</div>
-			</body>
-			</html>
-		`
+		limitReader := io.LimitReader(resp.Body, 1024*1024) // 1 MB for instance
+		errBody, errErr := io.ReadAll(limitReader)
 
-		errBody, errErr := io.ReadAll(resp.Body)
-		if errErr == nil && len(errBody) != 0 {
-			errPage =
-				`
-				<!DOCTYPE html>
-				<html>
-					<head>
-						<title>Error: ` + resp.Status + `</title>
-						<style>
-							body {
-							font-family: 'Helvetica Neue', sans-serif;
-							color: #333;
-							margin: 0;
-							padding: 0;
-							}
-							.container {
-							display: flex;
-							align-items: center;
-							justify-content: center;
-							height: 100vh;
-							background: #fafafa;
-							}
-							.error-box {
-							width: 600px;
-							padding: 20px;
-							background: #fff;
-							border-radius: 5px;
-							box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-							}
-							.error-box h1 {
-							font-size: 36px;
-							margin-bottom: 20px;
-							}
-							.error-box p {
-							font-size: 16px;
-							line-height: 1.5;
-							margin-bottom: 20px;
-							}
-							.error-box p.description {
-							font-style: italic;
-							color: #666;
-							}
-							.error-box a {
-							display: inline-block;
-							padding: 10px 20px;
-							background: #00b8d4;
-							color: #fff;
-							border-radius: 5px;
-							text-decoration: none;
-							font-size: 16px;
-							}
-						</style>
-					</head>
-					<body>
-						<div class="container">
-							<div class="error-box">
-							<h1>Error: ` + resp.Status + `</h1>
-							<p>Sorry, the backend returned this error.</p>
-							<iframe width="100%" height="25%" style="border:1px ridge lightgrey; border-radius: 5px;"
-							srcdoc="
-								` + string(errBody) + `">
-							</iframe>
-							<a onclick="location.reload()">Reload page</a>
-							</div>
-						</div>
-					</body>
-				</html>
-				`
+		// Close the original body
+		resp.Body.Close()
+
+		errMsg := ""
+		if errErr == nil && len(errBody) > 0 {
+			errMsg = string(errBody)
+			if int64(len(errBody)) == 1024*1024 {
+				errMsg += `<p>( Error message truncated. )</p>`
+			}
 		}
+
+		if errErr == nil && len(errBody) != 0 {
+
+			buffer.WriteString(`<!DOCTYPE html><html><head><title>Error: `)
+			buffer.WriteString(resp.Status)
+			buffer.WriteString(`</title><style>body{font-family:'Helvetica Neue',sans-serif;color:#333;margin:0;padding:0}.container{display:flex;align-items:center;justify-content:center;height:100vh;background:#fafafa}.error-box{width:600px;padding:20px;background:#fff;border-radius:5px;box-shadow:0 2px 4px rgba(0,0,0,.1)}.error-box h1{font-size:36px;margin-bottom:20px}.error-box p{font-size:16px;line-height:1.5;margin-bottom:20px}.error-box p.description{font-style:italic;color:#666}.error-box a{display:inline-block;padding:10px 20px;background:#00b8d4;color:#fff;border-radius:5px;text-decoration:none;font-size:16px}</style><div class=container><div class=error-box><h1>Error:`)
+			buffer.WriteString(`</h1><p>Sorry, the backend returned this error.</p><iframe width="100%" height="25%" style="border:1px ridge lightgrey; border-radius: 5px;"srcdoc="`)
+			buffer.WriteString(errMsg)
+			buffer.WriteString(`"></iframe><a onclick="location.reload()">Reload page</a></div></div></body></html>`)
+
+		} else {
+
+			buffer.WriteString(`<!DOCTYPE html><html><head><title>Error: `)
+			buffer.WriteString(resp.Status)
+			buffer.WriteString(`</title><style>body{font-family:'Helvetica Neue',sans-serif;color:#333;margin:0;padding:0}.container{display:flex;align-items:center;justify-content:center;height:100vh;background:#fafafa}.error-box{width:600px;padding:20px;background:#fff;border-radius:5px;box-shadow:0 2px 4px rgba(0,0,0,.1)}.error-box h1{font-size:36px;margin-bottom:20px}.error-box p{font-size:16px;line-height:1.5;margin-bottom:20px}.error-box p.description{font-style:italic;color:#666}.error-box a{display:inline-block;padding:10px 20px;background:#00b8d4;color:#fff;border-radius:5px;text-decoration:none;font-size:16px}</style><div class=container><div class=error-box><h1>`)
+			buffer.WriteString(resp.Status)
+			buffer.WriteString(`</h1><p>Sorry, the backend returned an error. That's all we know.</p><a onclick="location.reload()">Reload page</a></div></div></body></html>`)
+		}
+
 		resp.Body.Close()
 
 		return &http.Response{
 			StatusCode: http.StatusOK,
-			Body:       io.NopCloser(strings.NewReader(errPage)),
+			Body:       io.NopCloser(bytes.NewReader(buffer.Bytes())),
 		}, nil
 	}
 
-	resp.Header.Set("proxy-cache", "MISS")
-
-	if cacheRes != 0 && req.Method != "POST" && proxy.CacheEnabled {
-		if resp.StatusCode < 300 || (resp.StatusCode < 500 && resp.StatusCode >= 400) {
-			bodyBytes, bodyErr := io.ReadAll(resp.Body)
-
-			resp.Body = io.NopCloser(bytes.NewReader(bodyBytes))
-
-			if bodyErr != nil {
-				return &http.Response{
-					StatusCode: http.StatusBadGateway,
-					Body:       io.NopCloser(strings.NewReader("BalooProxy: Failed to read responsebody of backend")),
-				}, bodyErr
-			}
-
-			var cacheKey string
-			switch cacheRes {
-			case proxy.CACHE_DEFAULT:
-				cacheKey = req.Host + req.URL.Path + req.URL.RawQuery + req.Method
-			case proxy.CACHE_DEFAULT_STRICT:
-				cacheKey = req.Host + req.URL.Path + req.URL.RawQuery
-			case proxy.CACHE_CAREFUL:
-				cacheKey = req.Host + reqIP + req.URL.Path + req.URL.RawQuery + req.Method
-			case proxy.CACHE_CAREFUL_STRICT:
-				cacheKey = req.Host + reqIP + req.URL.Path + req.URL.RawQuery
-			case proxy.CACHE_IGNORE_QUERY:
-				cacheKey = req.Host + req.URL.Path
-			case proxy.CACHE_QUERY:
-				cacheKey = req.Host + req.URL.RawQuery
-			case proxy.CACHE_CLIENTIP:
-				cacheKey = req.Host + reqIP
-			default:
-				panic("[ " + utils.RedText("Error") + " ]: " + utils.RedText("Cache Error: Failed to get correct cache resp"))
-			}
-
-			domains.DomainsCache.Store(cacheKey, domains.CacheResponse{
-				Domain:    resp.Request.Host,
-				Timestamp: int(proxy.LastSecondTime.Unix()) + 3600, //Cache for an hour
-				Status:    resp.StatusCode,
-				Headers:   resp.Header,
-				Body:      bodyBytes,
-			})
-		}
-	}
 	return resp, nil
 }
 
-func evalCache(domainSettings domains.DomainSettings, message gofilter.Message) int {
-	for _, rule := range domainSettings.CacheRules {
-		if rule.Filter.Apply(message) {
-			switch rule.Action {
-			case "BYPASS":
-				return 0
-			case "DEFAULT":
-				return proxy.CACHE_DEFAULT
-			case "DEFAULT_STRICT":
-				return proxy.CACHE_DEFAULT_STRICT
-			case "CAREFUL":
-				return proxy.CACHE_CAREFUL
-			case "CAREFUL_STRICT":
-				return proxy.CACHE_CAREFUL_STRICT
-			case "IGNORE_QUERY":
-				return proxy.CACHE_IGNORE_QUERY
-			case "QUERY":
-				return proxy.CACHE_QUERY
-			case "CLIENTIP":
-				return proxy.CACHE_CLIENTIP
-			default:
-			}
-		}
+var defaultTransport = &http.Transport{
+	DialContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
+		return (&net.Dialer{
+			Timeout:   5 * time.Second,
+			KeepAlive: 30 * time.Second,
+		}).DialContext(ctx, network, addr)
+	},
+	TLSHandshakeTimeout: 10 * time.Second,
+	TLSClientConfig:     &tls.Config{InsecureSkipVerify: true},
+	IdleConnTimeout:     90 * time.Second,
+	MaxIdleConns:        10,
+	MaxConnsPerHost:     10,
+}
+
+func getTripperForDomain(domain string) *http.Transport {
+
+	transport, ok := transportMap.Load(domain)
+	if !ok {
+		transport, _ = transportMap.LoadOrStore(domain, defaultTransport)
 	}
-	return 0
+	return transport.(*http.Transport)
 }
 
 type RoundTripper struct {

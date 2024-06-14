@@ -2,13 +2,10 @@ package server
 
 import (
 	"bytes"
-	"context"
 	"encoding/base64"
-	"fmt"
 	"goProxy/core/api"
 	"goProxy/core/domains"
 	"goProxy/core/firewall"
-	"goProxy/core/pnc"
 	"goProxy/core/proxy"
 	"goProxy/core/utils"
 	"image"
@@ -24,19 +21,28 @@ import (
 	"github.com/kor44/gofilter"
 )
 
+func SendResponse(str string, buffer *bytes.Buffer, writer http.ResponseWriter) {
+	buffer.WriteString(str)
+	writer.Write(buffer.Bytes())
+}
+
 func Middleware(writer http.ResponseWriter, request *http.Request) {
 
-	defer pnc.PanicHndl()
+	// defer pnc.PanicHndl() we wont do this during prod, to avoid overhead
+
+	buffer := bufferPool.Get().(*bytes.Buffer)
+	defer bufferPool.Put(buffer)
+	buffer.Reset()
 
 	domainName := request.Host
 
-	firewall.Mutex.Lock()
-	domainData := domains.DomainsData[domainName]
-	firewall.Mutex.Unlock()
+	firewall.Mutex.RLock()
+	domainData, domainFound := domains.DomainsData[domainName]
+	firewall.Mutex.RUnlock()
 
-	if domainData.Stage == 0 {
+	if !domainFound {
 		writer.Header().Set("Content-Type", "text/plain")
-		fmt.Fprintf(writer, "balooProxy: "+domainName+" does not exist. If you are the owner please check your config.json if you believe this is a mistake")
+		SendResponse("balooProxy: "+domainName+" does not exist. If you are the owner please check your config.json if you believe this is a mistake", buffer, writer)
 		return
 	}
 
@@ -50,6 +56,7 @@ func Middleware(writer http.ResponseWriter, request *http.Request) {
 	var ipCountCookie int
 
 	if domains.Config.Proxy.Cloudflare {
+
 		ip = request.Header.Get("Cf-Connecting-Ip")
 
 		tlsFp = "Cloudflare"
@@ -57,21 +64,20 @@ func Middleware(writer http.ResponseWriter, request *http.Request) {
 		botFp = ""
 		fpCount = 0
 
-		firewall.Mutex.Lock()
+		firewall.Mutex.RLock()
 		ipCount = firewall.AccessIps[ip]
 		ipCountCookie = firewall.AccessIpsCookie[ip]
-		firewall.Mutex.Unlock()
+		firewall.Mutex.RUnlock()
 	} else {
 		ip = strings.Split(request.RemoteAddr, ":")[0]
 
 		//Retrieve information about the client
-		firewall.Mutex.Lock()
+		firewall.Mutex.RLock()
 		tlsFp = firewall.Connections[request.RemoteAddr]
-
 		fpCount = firewall.UnkFps[tlsFp]
 		ipCount = firewall.AccessIps[ip]
 		ipCountCookie = firewall.AccessIpsCookie[ip]
-		firewall.Mutex.Unlock()
+		firewall.Mutex.RUnlock()
 
 		//Read-Only IMPORTANT: Must be put in mutex if you add the ability to change indexed fingerprints while program is running
 		browser = firewall.KnownFingerprints[tlsFp]
@@ -79,12 +85,13 @@ func Middleware(writer http.ResponseWriter, request *http.Request) {
 	}
 
 	firewall.Mutex.Lock()
+	firewall.WindowAccessIps[proxy.Last10SecondTimestamp][ip]++
 	domainData = domains.DomainsData[domainName]
 	domainData.TotalRequests++
 	domains.DomainsData[domainName] = domainData
 	firewall.Mutex.Unlock()
 
-	writer.Header().Set("baloo-Proxy", "1.4")
+	writer.Header().Set("baloo-Proxy", "1.5")
 
 	//Start the suspicious level where the stage currently is
 	susLv := domainData.Stage
@@ -92,14 +99,14 @@ func Middleware(writer http.ResponseWriter, request *http.Request) {
 	//Ratelimit faster if client repeatedly fails the verification challenge (feel free to play around with the threshhold)
 	if ipCountCookie > proxy.FailChallengeRatelimit {
 		writer.Header().Set("Content-Type", "text/plain")
-		fmt.Fprintf(writer, "Blocked by BalooProxy.\nYou have been ratelimited. (R1)")
+		SendResponse("Blocked by BalooProxy.\nYou have been ratelimited. (R1)", buffer, writer)
 		return
 	}
 
 	//Ratelimit spamming Ips (feel free to play around with the threshhold)
 	if ipCount > proxy.IPRatelimit {
 		writer.Header().Set("Content-Type", "text/plain")
-		fmt.Fprintf(writer, "Blocked by BalooProxy.\nYou have been ratelimited. (R2)")
+		SendResponse("Blocked by BalooProxy.\nYou have been ratelimited. (R2)", buffer, writer)
 		return
 	}
 
@@ -107,12 +114,12 @@ func Middleware(writer http.ResponseWriter, request *http.Request) {
 	if browser == "" {
 		if fpCount > proxy.FPRatelimit {
 			writer.Header().Set("Content-Type", "text/plain")
-			fmt.Fprintf(writer, "Blocked by BalooProxy.\nYou have been ratelimited. (R3)")
+			SendResponse("Blocked by BalooProxy.\nYou have been ratelimited. (R3)", buffer, writer)
 			return
 		}
 
 		firewall.Mutex.Lock()
-		firewall.UnkFps[tlsFp] = firewall.UnkFps[tlsFp] + 1
+		firewall.WindowUnkFps[proxy.Last10SecondTimestamp][tlsFp]++
 		firewall.Mutex.Unlock()
 	}
 
@@ -120,7 +127,7 @@ func Middleware(writer http.ResponseWriter, request *http.Request) {
 	forbiddenFp := firewall.ForbiddenFingerprints[tlsFp]
 	if forbiddenFp != "" {
 		writer.Header().Set("Content-Type", "text/plain")
-		fmt.Fprintf(writer, "Blocked by BalooProxy.\nYour browser %s is not allowed.", forbiddenFp)
+		SendResponse("Blocked by BalooProxy.\nYour browser "+forbiddenFp+" is not allowed.", buffer, writer)
 		return
 	}
 
@@ -138,66 +145,76 @@ func Middleware(writer http.ResponseWriter, request *http.Request) {
 
 	reqUa := request.UserAgent()
 
-	requestVariables := gofilter.Message{
-		"ip.src":                net.ParseIP(ip),
-		"ip.country":            ipInfoCountry,
-		"ip.asn":                ipInfoASN,
-		"ip.engine":             browser,
-		"ip.bot":                botFp,
-		"ip.fingerprint":        tlsFp,
-		"ip.http_requests":      ipCount,
-		"ip.challenge_requests": ipCountCookie,
+	if len(domainSettings.CustomRules) != 0 {
+		requestVariables := gofilter.Message{
+			"ip.src":                net.ParseIP(ip),
+			"ip.country":            ipInfoCountry,
+			"ip.asn":                ipInfoASN,
+			"ip.engine":             browser,
+			"ip.bot":                botFp,
+			"ip.fingerprint":        tlsFp,
+			"ip.http_requests":      ipCount,
+			"ip.challenge_requests": ipCountCookie,
 
-		"http.host":       request.Host,
-		"http.version":    request.Proto,
-		"http.method":     request.Method,
-		"http.url":        request.RequestURI,
-		"http.query":      request.URL.RawQuery,
-		"http.path":       request.URL.Path,
-		"http.user_agent": strings.ToLower(reqUa),
-		"http.cookie":     request.Header.Get("Cookie"),
+			"http.host":       domainName,
+			"http.version":    request.Proto,
+			"http.method":     request.Method,
+			"http.url":        request.RequestURI,
+			"http.query":      request.URL.RawQuery,
+			"http.path":       request.URL.Path,
+			"http.user_agent": strings.ToLower(reqUa),
+			"http.cookie":     request.Header.Get("Cookie"),
 
-		"proxy.stage":         domainData.Stage,
-		"proxy.cloudflare":    domains.Config.Proxy.Cloudflare,
-		"proxy.stage_locked":  domainData.StageManuallySet,
-		"proxy.attack":        domainData.RawAttack,
-		"proxy.bypass_attack": domainData.BypassAttack,
-		"proxy.rps":           domainData.RequestsPerSecond,
-		"proxy.rps_allowed":   domainData.RequestsBypassedPerSecond,
+			"proxy.stage":         domainData.Stage,
+			"proxy.cloudflare":    domains.Config.Proxy.Cloudflare,
+			"proxy.stage_locked":  domainData.StageManuallySet,
+			"proxy.attack":        domainData.RawAttack,
+			"proxy.bypass_attack": domainData.BypassAttack,
+			"proxy.rps":           domainData.RequestsPerSecond,
+			"proxy.rps_allowed":   domainData.RequestsBypassedPerSecond,
+		}
+
+		susLv = firewall.EvalFirewallRule(domainSettings, requestVariables, susLv)
 	}
-
-	susLv = firewall.EvalFirewallRule(domainSettings, requestVariables, susLv)
 
 	//Check if encryption-result is already "cached" to prevent load on reverse proxy
 	encryptedIP := ""
-	susLvStr := strconv.Itoa(susLv)
-	encryptedCache, encryptedExists := firewall.CacheIps.Load(ip + susLvStr)
+	hashedEncryptedIP := ""
+	susLvStr := utils.StageToString(susLv)
+	accessKey := ip + tlsFp + reqUa + proxy.CurrHourStr
+	encryptedCache, encryptedExists := firewall.CacheIps.Load(accessKey + susLvStr)
 
 	if !encryptedExists {
 		switch susLv {
 		case 0:
 			//whitelisted
 		case 1:
-			encryptedIP = utils.Encrypt(ip+tlsFp+reqUa+strconv.Itoa(proxy.CurrHour), proxy.CookieOTP)
+			encryptedIP = utils.Encrypt(accessKey, proxy.CookieOTP)
 		case 2:
-			encryptedIP = utils.Encrypt(ip+tlsFp+reqUa+strconv.Itoa(proxy.CurrHour), proxy.JSOTP)
+			encryptedIP = utils.Encrypt(accessKey, proxy.JSOTP)
+			hashedEncryptedIP = utils.EncryptSha(encryptedIP, "")
+			firewall.CacheIps.Store(encryptedIP, hashedEncryptedIP)
 		case 3:
-			encryptedIP = utils.Encrypt(ip+tlsFp+reqUa+strconv.Itoa(proxy.CurrHour), proxy.CaptchaOTP)
+			encryptedIP = utils.Encrypt(accessKey, proxy.CaptchaOTP)
 		default:
 			writer.Header().Set("Content-Type", "text/plain")
-			fmt.Fprintf(writer, "Blocked by BalooProxy.\nSuspicious request of level %s (base %d)", susLvStr, domainData.Stage)
+			SendResponse("Blocked by BalooProxy.\nSuspicious request of level "+susLvStr+" (base "+strconv.Itoa(domainData.Stage)+")", buffer, writer)
 			return
 		}
-		firewall.CacheIps.Store(ip+susLvStr, encryptedIP)
+		firewall.CacheIps.Store(accessKey+susLvStr, encryptedIP)
 	} else {
 		encryptedIP = encryptedCache.(string)
+		cachedHIP, foundCachedHIP := firewall.CacheIps.Load(encryptedIP)
+		if foundCachedHIP {
+			hashedEncryptedIP = cachedHIP.(string)
+		}
 	}
 
 	//Check if client provided correct verification result
 	if !strings.Contains(request.Header.Get("Cookie"), "__bProxy_v="+encryptedIP) {
 
 		firewall.Mutex.Lock()
-		firewall.AccessIpsCookie[ip] = firewall.AccessIpsCookie[ip] + 1
+		firewall.WindowAccessIpsCookie[proxy.Last10SecondTimestamp][ip]++
 		firewall.Mutex.Unlock()
 
 		//Respond with verification challenge if client didnt provide correct result/none
@@ -209,8 +226,10 @@ func Middleware(writer http.ResponseWriter, request *http.Request) {
 			http.Redirect(writer, request, request.URL.RequestURI(), http.StatusFound)
 			return
 		case 2:
+			publicSalt := encryptedIP[:len(encryptedIP)-domainData.Stage2Difficulty]
 			writer.Header().Set("Content-Type", "text/html")
-			fmt.Fprintf(writer, `<script>let hasMemApi=!1,useMem=!1,hasKnownMem=!1,startMem=null,plugCh=!1,mimeCh=!1;function calcSolution(e){let i=0;for(var t=Math.pow(e,7);t>=0;t--)i+=Math.atan(t)*Math.tan(t);return!0}if(void 0!=performance.memory){if(hasMemApi=!0,startMem=performance.memory,161e5==performance.memory.totalJSHeapSize||127e5==performance.memory.usedJSHeapSize||1e7==performance.memory.usedJSHeapSize||219e4==performance.memory.jsHeapSizeLimit)for(hasKnownMem=!0;calcSolution(performance.memory.usedJSHeapSize);)0>performance.now()&&(hasKnownMem=!1);else calcSolution(8)}if(hasMemApi){let e=performance.memory;if(startMem.usedJSHeapSize==e.usedJSHeapSize&&startMem.jsHeapSizeLimit==e.jsHeapSizeLimit&&startMem.totalJSHeapSize==e.totalJSHeapSize)for(useMem=!0;calcSolution(performance.memory.usedJSHeapSize);)0>performance.now()&&(hasKnownMem=!1)}let pluginString=Object.getOwnPropertyDescriptor(Object.getPrototypeOf(navigator),"plugins").get.toString();"function get plugins() { [native code] }"!=pluginString&&"function plugins() {\n        [native code]\n    }"!=pluginString&&"function plugins() {\n    [native code]\n}"!=pluginString&&(plugCh=!0);let mimeString=Object.getOwnPropertyDescriptor(Object.getPrototypeOf(navigator),"plugins").get.toString();"function get plugins() { [native code] }"!=mimeString&&"function plugins() {\n        [native code]\n    }"!=mimeString&&"function plugins() {\n    [native code]\n}"!=mimeString&&(mimeCh=!0),mimeCh||plugCh||useMem||hasKnownMem||(document.cookie="_2__bProxy_v=%s; SameSite=Lax; path=/; Secure",window.location.reload());</script>`, encryptedIP)
+			writer.Header().Set("Cache-Control", "no-store, no-cache, must-revalidate, max-age=0") // Prevent special(ed) browsers from caching the challenge
+			SendResponse(`<!doctypehtml><html lang=en><meta charset=UTF-8><meta content="width=device-width,initial-scale=1"name=viewport><title>Completing challenge ...</title><style>body,html{height:100%;width:100%;margin:0;display:flex;flex-direction:column;justify-content:center;align-items:center;background-color:#f0f0f0;font-family:Arial,sans-serif}.loader{display:flex;justify-content:space-around;align-items:center;width:100px;height:100px}.loader div{width:20px;height:20px;background-color:#333;border-radius:50%;animation:bounce .6s infinite alternate}.loader div:nth-child(2){animation-delay:.2s}.loader div:nth-child(3){animation-delay:.4s}@keyframes bounce{to{transform:translateY(-30px)}}.message{text-align:center;margin-top:20px;color:#333}.subtext{text-align:center;color:#666;font-size:.9em;margin-top:5px}.placeholder-container{width:25%;text-align:center;margin:10px 0}.placeholder-label{font-weight:700;margin-bottom:5px}.placeholder{background-color:#e0e0e0;padding:10px;border-radius:5px;word-break:break-all;font-family:monospace;cursor:pointer;}</style><div class=loader><div></div><div></div><div></div></div><div class=message><p>Completing challenge ...<div class=subtext>The process is automatic and shouldn't take too long. Please be patient.</div></div><div class=placeholder-container><div class=placeholder-label>publicSalt:</div><div class=placeholder id=publicSalt onclick='ctc("publicSalt")'><span>`+publicSalt+`</span></div></div><div class=placeholder-container><div class=placeholder-label>challenge:</div><div class=placeholder id=challenge onclick='ctc("challenge")'><span>`+hashedEncryptedIP+`</span></div></div><script>function ctc(t){navigator.clipboard.writeText(document.getElementById(t).innerText)}</script><script src="https://cdn.jsdelivr.net/gh/41Baloo/balooPow@main/balooPow.min.js"></script><script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.0.0/crypto-js.min.js"></script><script>let hasMemoryApi=!1,useMemory=!1,hasKnownMemory=!1,startMemory=null,pluginChanged=!1,mimeChanged=!1;function calcSolution(e){let i=0;for(let n=Math.pow(e,7);n>=0;n--)i+=Math.atan(n)*Math.tan(n);return!0}function isMobile(){var e=window.matchMedia||window.msMatchMedia;return!!e&&e("(pointer:coarse)").matches}if(void 0!==performance.memory){hasMemoryApi=!0,startMemory=performance.memory;let{totalJSHeapSize:e,usedJSHeapSize:i,jsHeapSizeLimit:n}=performance.memory;if(([161e5,127e5,1e7,219e4].includes(e)||[161e5,127e5,1e7,219e4].includes(i))&&!isMobile()){for(hasKnownMemory=!0;calcSolution(i);)if(0>performance.now()){hasKnownMemory=!1;break}}}const pluginDescriptor=Object.getOwnPropertyDescriptor(Object.getPrototypeOf(navigator),"plugins"),pluginString=pluginDescriptor.get.toString(),pluginStringsToCheck=["function get plugins() { [native code] }","function plugins() {\n        [native code]\n    }","function plugins() {\n    [native code]\n}"];pluginStringsToCheck.includes(pluginString)||(pluginChanged=!0);const mimeString=pluginDescriptor.get.toString();function solved(e){document.cookie="_2__bProxy_v=`+publicSalt+`"+e.solution+"; SameSite=Lax; path=/; Secure",location.href=location.href}pluginStringsToCheck.includes(mimeString)||(mimeChanged=!0),!mimeChanged&&!pluginChanged&&!useMemory&&!hasKnownMemory&&new BalooPow("`+publicSalt+`",`+strconv.Itoa(domainData.Stage2Difficulty)+`,"`+hashedEncryptedIP+`",!1).Solve().then(e=>{if(e.match){if(hasMemoryApi){let{usedJSHeapSize:i,jsHeapSizeLimit:n,totalJSHeapSize:t}=startMemory;i!==(currentMemory=performance.memory).usedJSHeapSize||n!==currentMemory.jsHeapSizeLimit||t!==currentMemory.totalJSHeapSize||isMobile()?solved(e):alert("Memory Missmatch. Please contact @ddosmitigation")}else solved(e)}else alert("Navigator Missmatch. Please contact @ddosmitigation")});</script>`, buffer, writer)
 			return
 		case 3:
 			secretPart := encryptedIP[:6]
@@ -235,7 +254,7 @@ func Middleware(writer http.ResponseWriter, request *http.Request) {
 
 				var buf bytes.Buffer
 				if err := png.Encode(&buf, captchaImg); err != nil {
-					fmt.Fprintf(writer, `BalooProxy Error: Failed to encode captcha: %s`, err)
+					writer.Write([]byte("BalooProxy Error: Failed to encode captcha: " + err.Error()))
 					return
 				}
 				data := buf.Bytes()
@@ -248,258 +267,28 @@ func Middleware(writer http.ResponseWriter, request *http.Request) {
 			}
 
 			writer.Header().Set("Content-Type", "text/html")
-			fmt.Fprintf(writer,
-				`
-					<html>
-					<head>
-						<style>
-						body {
-							background-color: #f5f5f5;
-							font-family: Arial, sans-serif;
-						}
-
-						.center {
-							display: flex;
-							align-items: center;
-							justify-content: center;
-							height: 100vh;
-						}
-
-						.box {
-							background-color: white;
-							border: 1px solid #ddd;
-							border-radius: 4px;
-							padding: 20px;
-							width: 500px;
-						}
-
-						canvas {
-							display: block;
-							margin: 0 auto;
-							max-width: 100%%;
-							width: 100%%;
-    						height: auto;
-						}
-
-						input[type="text"] {
-							width: 100%%;
-							padding: 12px 20px;
-							margin: 8px 0;
-							box-sizing: border-box;
-							border: 2px solid #ccc;
-							border-radius: 4px;
-						}
-
-						button {
-							width: 100%%;
-							background-color: #4caf50;
-							color: white;
-							padding: 14px 20px;
-							margin: 8px 0;
-							border: none;
-							border-radius: 4px;
-							cursor: pointer;
-						}
-
-						button:hover {
-							background-color: #45a049;
-						}
-						/* Add styles for the animation */ 
-
-	.box {
-		background-color: white;
-		border: 1px solid #ddd;
-		border-radius: 4px;
-		padding: 20px;
-		width: 500px;
-		/* Add a transition effect for the height */ 
-		transition: height 0.1s;
-		position: block;
-	}
-	/* Add a transition effect for the opacity */ 
-
-	.box * {
-		transition: opacity 0.1s;
-	}
-	/* Add a success message and style it */ 
-
-	.success {
-		background-color: #dff0d8;
-		border: 1px solid #d6e9c6;
-		border-radius: 4px;
-		color: #3c763d;
-		padding: 20px;
-	}
-
-	.failure {
-		background-color: #f0d8d8;
-		border: 1px solid #e9c6c6;
-		border-radius: 4px;
-		color: #763c3c;
-		padding: 20px;
-	}
-	/* Add styles for the collapsible help text */ 
-
-						.collapsible {
-							background-color: #f5f5f5;
-							color: #444;
-							cursor: pointer;
-							padding: 18px;
-							width: 100%%;
-							border: none;
-							text-align: left;
-							outline: none;
-							font-size: 15px;
-						}
-
-						.collapsible:after {
-							content: '\002B';
-							color: #777;
-							font-weight: bold;
-							float: right;
-							margin-left: 5px;
-						}
-
-						.collapsible.active:after {
-							content: "\2212";
-						}
-
-						.collapsible:hover {
-							background-color: #e5e5e5;
-						}
-
-						.collapsible-content {
-							padding: 0 18px;
-							max-height: 0;
-							overflow: hidden;
-							transition: max-height 0.2s ease-out;
-							background-color: #f5f5f5;
-						}
-						</style>
-					</head>
-					<body>
-						<div class="center" id="center">
-							<div class="box" id="box">
-								<h1>Enter the <b>green</b> text you see in the picture</h1>  <canvas id="image" width="100" height="37"></canvas>
-								<form onsubmit="return checkAnswer(event)">
-									<input id="text" type="text" maxlength="6" placeholder="Solution" required>
-									<button type="submit">Submit</button>
-								</form>
-								<div class="success" id="successMessage" style="display: none;">Success! Redirecting ...</div>
-								<div class="failure" id="failMessage" style="display: none;">Failed! Please try again.</div>
-								<button class="collapsible">Why am I seeing this page?</button>
-								<div class="collapsible-content">
-									<p> The website you are trying to visit needs to make sure that you are not a bot. This is a common security measure to protect websites from automated spam and abuse. By entering the characters you see in the picture, you are helping to verify that you are a real person. </p>
-								</div>
-							</div>
-						</div>
-					</body>
-					<script>
-					let canvas=document.getElementById("image");
-					let ctx = canvas.getContext("2d");
-					var image = new Image();
-					image.onload = function() {
-						ctx.drawImage(image, (canvas.width-image.width)/2, (canvas.height-image.height)/2);
-					};
-					image.src = "data:image/png;base64,%s";
-					function checkAnswer(event) {
-						// Prevent the form from being submitted
-						event.preventDefault();
-						// Get the user's input
-						var input = document.getElementById('text').value;
-
-						document.cookie = '%s_3__bProxy_v='+input+'%s; SameSite=Lax; path=/; Secure';
-
-						// Check if the input is correct
-						fetch('https://' + location.hostname + '/_bProxy/verified').then(function(response) {
-							return response.text();
-						}).then(function(text) {
-							if(text === 'verified') {
-								// If the answer is correct, show the success message
-								var successMessage = document.getElementById("successMessage");
-								successMessage.style.display = "block";
-
-								setInterval(function(){
-									// Animate the collapse of the box
-									var box = document.getElementById("box");
-									var height = box.offsetHeight;
-									var collapse = setInterval(function() {
-										height -= 20;
-										box.style.height = height + "px";
-										// Reduce the opacity of the child elements as the box collapses
-										var elements = box.children;
-										//successMessage.remove()
-										for(var i = 0; i < elements.length; i++) {
-											elements[i].style.opacity = 0
-										}
-										if(height <= 0) {
-											// Set the height of the box to 0 after the collapse is complete
-											box.style.height = "0";
-											// Stop the collapse animation
-											box.remove()
-											clearInterval(collapse);
-											location.reload();
-										}
-									}, 20);
-								}, 1000)
-							} else {
-								var failMessage = document.getElementById('failMessage');
-								failMessage.style.display = 'block';
-								setInterval(function() {
-									location.reload()
-								}, 1000)
-							}
-						}).catch(function(err){
-							var failMessage = document.getElementById('failMessage');
-							failMessage.style.display = 'block';
-							setInterval(function() {
-								location.reload()
-							}, 1000)
-						})
-					}
-					// Add JavaScript to toggle the visibility of the collapsible content
-					var coll = document.getElementsByClassName("collapsible");
-					var i;
-					for(i = 0; i < coll.length; i++) {
-						coll[i].addEventListener("click", function() {
-							this.classList.toggle("active");
-							var content = this.nextElementSibling;
-							if(content.style.maxHeight) {
-								content.style.maxHeight = null;
-							} else {
-								content.style.maxHeight = content.scrollHeight + "px";
-							}
-						});
-					}
-					</script>
-					`, captchaData, ip, publicPart)
+			writer.Header().Set("Cache-Control", "no-store, no-cache, must-revalidate, max-age=0") // Prevent special(ed) browsers from caching the challenge
+			SendResponse(`<style>body{background-color:#f5f5f5;font-family:Arial,sans-serif}.center{display:flex;align-items:center;justify-content:center;height:100vh}.box{background-color:#fff;border:1px solid #ddd;border-radius:4px;padding:20px;width:500px}canvas{display:block;margin:0 auto;max-width:100%;width:100%;height:auto}input[type=text]{width:100%;padding:12px 20px;margin:8px 0;box-sizing:border-box;border:2px solid #ccc;border-radius:4px}button{width:100%;background-color:#4caf50;color:#fff;padding:14px 20px;margin:8px 0;border:none;border-radius:4px;cursor:pointer}button:hover{background-color:#45a049}.box{background-color:#fff;border:1px solid #ddd;border-radius:4px;padding:20px;width:500px;transition:height .1s;position:block}.box *{transition:opacity .1s}.success{background-color:#dff0d8;border:1px solid #d6e9c6;border-radius:4px;color:#3c763d;padding:20px}.failure{background-color:#f0d8d8;border:1px solid #e9c6c6;border-radius:4px;color:#763c3c;padding:20px}.collapsible{background-color:#f5f5f5;color:#444;cursor:pointer;padding:18px;width:100%;border:none;text-align:left;outline:0;font-size:15px}.collapsible:after{content:'\002B';color:#777;font-weight:700;float:right;margin-left:5px}.collapsible.active:after{content:"\2212"}.collapsible:hover{background-color:#e5e5e5}.collapsible-content{padding:0 18px;max-height:0;overflow:hidden;transition:max-height .2s ease-out;background-color:#f5f5f5}</style><div class=center id=center><div class=box id=box><h1>Enter the <b>green</b> text you see in the picture</h1><canvas height=37 id=image width=100></canvas><form onsubmit="return checkAnswer(event)"><input id=text type=text maxlength=6 placeholder=Solution required> <button type=submit>Submit</button></form><div class=success id=successMessage style=display:none>Success! Redirecting ...</div><div class=failure id=failMessage style=display:none>Failed! Please try again.</div><button class=collapsible>Why am I seeing this page?</button><div class=collapsible-content><p>The website you are trying to visit needs to make sure that you are not a bot. This is a common security measure to protect websites from automated spam and abuse. By entering the characters you see in the picture, you are helping to verify that you are a real person.</div></div></div><script>let canvas=document.getElementById("image"),ctx=canvas.getContext("2d");var i,image=new Image;function checkAnswer(e){e.preventDefault();var t=document.getElementById("text").value;document.cookie="`+ip+`_3__bProxy_v="+t+"`+publicPart+`; SameSite=Lax; path=/; Secure",fetch("https://"+location.hostname+"/_bProxy/verified").then(function(e){return e.text()}).then(function(e){"verified"===e?(document.getElementById("successMessage").style.display="block",setInterval(function(){var e=document.getElementById("box"),t=e.offsetHeight,a=setInterval(function(){t-=20,e.style.height=t+"px";for(var l=e.children,n=0;n<l.length;n++)l[n].style.opacity=0;t<=0&&(e.style.height="0",e.remove(),clearInterval(a),location.href=location.href)},20)},1e3)):(document.getElementById("failMessage").style.display="block",setInterval(function(){location.href=location.href},1e3))}).catch(function(e){document.getElementById("failMessage").style.display="block",setInterval(function(){location.href=location.href},1e3)})}image.onload=function(){ctx.drawImage(image,(canvas.width-image.width)/2,(canvas.height-image.height)/2)},image.src="data:image/png;base64,`+captchaData+`";var coll=document.getElementsByClassName("collapsible");for(i=0;i<coll.length;i++)coll[i].addEventListener("click",function(){this.classList.toggle("active");var e=this.nextElementSibling;e.style.maxHeight?e.style.maxHeight=null:e.style.maxHeight=e.scrollHeight+"px"});</script>`, buffer, writer)
 			return
 		default:
 			writer.Header().Set("Content-Type", "text/plain")
-			fmt.Fprintf(writer, "Blocked by BalooProxy.\nSuspicious request of level %d (base %d)", susLv, domainData.Stage)
+			SendResponse("Blocked by BalooProxy.\nSuspicious request of level "+susLvStr, buffer, writer)
 			return
 		}
 	}
 
 	//Access logs of clients that passed the challenge
 	if browser != "" || botFp != "" {
-		access := "[ " + utils.RedText(proxy.LastSecondTime.Format("15:04:05")) + " ] > \033[35m" + ip + "\033[0m - \033[32m" + browser + botFp + "\033[0m - " + utils.RedText(request.UserAgent()) + " - " + utils.RedText(request.RequestURI)
+		access := "[ " + utils.PrimaryColor(proxy.LastSecondTimeFormated) + " ] > \033[35m" + ip + "\033[0m - \033[32m" + browser + botFp + "\033[0m - " + utils.PrimaryColor(reqUa) + " - " + utils.PrimaryColor(request.RequestURI)
 		firewall.Mutex.Lock()
 		domainData = utils.AddLogs(access, domainName)
-		firewall.AccessIps[ip] = firewall.AccessIps[ip] + 1
 		firewall.Mutex.Unlock()
 	} else {
-		access := "[ " + utils.RedText(proxy.LastSecondTime.Format("15:04:05")) + " ] > \033[35m" + ip + "\033[0m - \033[31mUNK (" + tlsFp + ")\033[0m - " + utils.RedText(request.UserAgent()) + " - " + utils.RedText(request.RequestURI)
+		access := "[ " + utils.PrimaryColor(proxy.LastSecondTimeFormated) + " ] > \033[35m" + ip + "\033[0m - \033[31mUNK (" + tlsFp + ")\033[0m - " + utils.PrimaryColor(reqUa) + " - " + utils.PrimaryColor(request.RequestURI)
 		firewall.Mutex.Lock()
 		domainData = utils.AddLogs(access, domainName)
-		firewall.AccessIps[ip] = firewall.AccessIps[ip] + 1
 		firewall.Mutex.Unlock()
 	}
-
-	ctx := context.WithValue(request.Context(), "filter", requestVariables)
-	request = request.WithContext(ctx)
-	ctx = context.WithValue(request.Context(), "domain", domainSettings)
-	request = request.WithContext(ctx)
 
 	firewall.Mutex.Lock()
 	domainData = domains.DomainsData[domainName]
@@ -508,32 +297,38 @@ func Middleware(writer http.ResponseWriter, request *http.Request) {
 	firewall.Mutex.Unlock()
 
 	//Reserved proxy-paths
+
 	switch request.URL.Path {
 	case "/_bProxy/stats":
 		writer.Header().Set("Content-Type", "text/plain")
-		fmt.Fprintf(writer, "Stage: %s\nTotal Requests: %s\nBypassed Requests: %s\nTotal R/s: %s\nBypassed R/s: %s", strconv.Itoa(domainData.Stage), strconv.Itoa(domainData.TotalRequests), strconv.Itoa(domainData.BypassedRequests), strconv.Itoa(domainData.RequestsPerSecond), strconv.Itoa(domainData.RequestsBypassedPerSecond))
+		SendResponse("Stage: "+utils.StageToString(domainData.Stage)+"\nTotal Requests: "+strconv.Itoa(domainData.TotalRequests)+"\nBypassed Requests: "+strconv.Itoa(domainData.BypassedRequests)+"\nTotal R/s: "+strconv.Itoa(domainData.RequestsPerSecond)+"\nBypassed R/s: "+strconv.Itoa(domainData.RequestsBypassedPerSecond)+"\nProxy Fingerprint: "+proxy.Fingerprint, buffer, writer)
 		return
 	case "/_bProxy/fingerprint":
 		writer.Header().Set("Content-Type", "text/plain")
-
-		firewall.Mutex.Lock()
-		fmt.Fprintf(writer, "IP: "+ip+"\nASN: "+ipInfoASN+"\nCountry: "+ipInfoCountry+"\nIP Requests: "+strconv.Itoa(ipCount)+"\nIP Challenge Requests: "+strconv.Itoa(firewall.AccessIpsCookie[ip])+"\nSusLV: "+strconv.Itoa(susLv)+"\nFingerprint: "+tlsFp+"\nBrowser: "+browser+botFp)
-		firewall.Mutex.Unlock()
+		SendResponse("IP: "+ip+"\nASN: "+ipInfoASN+"\nCountry: "+ipInfoCountry+"\nIP Requests: "+strconv.Itoa(ipCount)+"\nIP Challenge Requests: "+strconv.Itoa(ipCountCookie)+"\nSusLV: "+strconv.Itoa(susLv)+"\nFingerprint: "+tlsFp+"\nBrowser: "+browser+botFp, buffer, writer)
 		return
 	case "/_bProxy/verified":
 		writer.Header().Set("Content-Type", "text/plain")
-		fmt.Fprintf(writer, "verified")
+		SendResponse("verified", buffer, writer)
 		return
 	case "/_bProxy/" + proxy.AdminSecret + "/api/v1":
 		result := api.Process(writer, request, domainData)
 		if result {
 			return
 		}
+
 	//Do not remove or modify this. It is required by the license
 	case "/_bProxy/credits":
 		writer.Header().Set("Content-Type", "text/plain")
-		fmt.Fprintf(writer, "BalooProxy; Lightweight http reverse-proxy https://github.com/41Baloo/balooProxy. Protected by GNU GENERAL PUBLIC LICENSE Version 2, June 1991")
+		SendResponse("BalooProxy; Lightweight http reverse-proxy https://github.com/41Baloo/balooProxy. Protected by GNU GENERAL PUBLIC LICENSE Version 2, June 1991", buffer, writer)
 		return
+	}
+
+	if strings.HasPrefix(request.URL.Path, "/_bProxy/api/v2") {
+		result := api.ProcessV2(writer, request)
+		if result {
+			return
+		}
 	}
 
 	//Allow backend to read client information

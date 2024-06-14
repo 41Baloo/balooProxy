@@ -11,11 +11,10 @@ import (
 )
 
 var (
-	Domains      = []string{}
-	DomainsMap   sync.Map
-	DomainsData  = map[string]DomainData{}
-	DomainsCache sync.Map
-	Config       *Configuration
+	Domains     = []string{}
+	DomainsMap  sync.Map
+	DomainsData = map[string]DomainData{}
+	Config      *Configuration
 )
 
 type Configuration struct {
@@ -31,9 +30,9 @@ type Domain struct {
 	Key                 string          `json:"key"`
 	Webhook             WebhookSettings `json:"webhook"`
 	FirewallRules       []JsonRule      `json:"firewallRules"`
-	CacheRules          []JsonRule      `json:"cacheRules"`
 	BypassStage1        int             `json:"bypassStage1"`
 	BypassStage2        int             `json:"bypassStage2"`
+	Stage2Difficulty    int             `json:"stage2Difficulty"`
 	DisableBypassStage3 int             `json:"disableBypassStage3"`
 	DisableRawStage3    int             `json:"disableRawStage3"`
 	DisableBypassStage2 int             `json:"disableBypassStage2"`
@@ -46,9 +45,6 @@ type DomainSettings struct {
 	CustomRules    []Rule
 	IPInfo         bool
 	RawCustomRules []JsonRule
-
-	CacheRules    []Rule
-	RawCacheRules []JsonRule
 
 	DomainProxy        *httputil.ReverseProxy
 	DomainCertificates tls.Certificate
@@ -63,11 +59,15 @@ type DomainSettings struct {
 }
 
 type DomainData struct {
+	Name             string
 	Stage            int
 	StageManuallySet bool
+	Stage2Difficulty int
 	RawAttack        bool
 	BypassAttack     bool
-	LastLogs         []string
+	BufferCooldown   int
+
+	LastLogs []string
 
 	TotalRequests    int
 	BypassedRequests int
@@ -83,12 +83,14 @@ type DomainData struct {
 }
 
 type Proxy struct {
-	Cloudflare   bool              `json:"cloudflare"`
-	AdminSecret  string            `json:"adminsecret"`
-	APISecret    string            `json:"apisecret"`
-	Secrets      map[string]string `json:"secrets"`
-	Timeout      TimeoutSettings   `json:"timeout"`
-	Ratelimits   map[string]int    `json:"ratelimits"`
+	Cloudflare      bool              `json:"cloudflare"`
+	AdminSecret     string            `json:"adminsecret"`
+	APISecret       string            `json:"apisecret"`
+	Secrets         map[string]string `json:"secrets"`
+	Timeout         TimeoutSettings   `json:"timeout"`
+	RatelimitWindow int               `json:"ratelimit_time"`
+	Ratelimits      map[string]int    `json:"ratelimits"`
+	Colors          []string          `json:"colors"`
 }
 
 type TimeoutSettings struct {

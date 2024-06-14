@@ -3,10 +3,12 @@ package proxy
 import "time"
 
 const (
-	ProxyVersion float64 = 1.4
+	ProxyVersion float64 = 1.5
 )
 
 var (
+	Fingerprint string
+
 	WatchedDomain string
 	TWidth        int
 	THeight       int
@@ -25,6 +27,8 @@ var (
 	JSSecret string
 	JSOTP    string
 
+	JSDifficulty = 5
+
 	CaptchaSecret string
 	CaptchaOTP    string
 
@@ -38,6 +42,8 @@ var (
 	WriteTimeoutDuration      = time.Duration(WriteTimeout).Abs() * time.Second
 	ReadHeaderTimeoutDuration = time.Duration(ReadHeaderTimeout).Abs() * time.Second
 
+	RatelimitWindow = 120
+
 	IPRatelimit            int
 	FPRatelimit            int
 	FailChallengeRatelimit int
@@ -45,23 +51,12 @@ var (
 
 	RealTimeLogs = false
 
-	//Path + Query + Method
-	CACHE_DEFAULT = 1
-	//Path + Query
-	CACHE_DEFAULT_STRICT = 2
-	//IP + Path + Query + Method
-	CACHE_CAREFUL = 3
-	//IP + Path + Query
-	CACHE_CAREFUL_STRICT = 4
-	//Path
-	CACHE_IGNORE_QUERY = 5
-	//Query
-	CACHE_QUERY = 6
-	//IP
-	CACHE_CLIENTIP = 7
+	CurrHour               int
+	CurrHourStr            string
+	LastSecondTime         time.Time
+	LastSecondTimeFormated string
+	LastSecondTimestamp    int
+	Last10SecondTimestamp  int
 
-	CurrHour       int
-	LastSecondTime time.Time
-
-	CacheEnabled = false
+	Initialised = false
 )
