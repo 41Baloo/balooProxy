@@ -35,9 +35,9 @@ jobs:
           repo_token: "${{ secrets.GITHUB_TOKEN }}"
           automatic_release_tag: "latest"
           prerelease: true
-          title: "Latest Build (${{ env.uuid }})"
+          title: "Prerelease ${{ env.uuid }}"
           files: |
             dist/main
           body: |
-            This is an unstable build.
+            This is an automatic build that might have bugs.
             Release Tag: ${{ env.uuid }}
