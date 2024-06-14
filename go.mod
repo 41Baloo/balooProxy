@@ -7,12 +7,12 @@ require (
 	github.com/kor44/gofilter v0.0.0-20171111115139-75787865c72c
 	github.com/zeebo/blake3 v0.2.3
 	golang.org/x/image v0.17.0
+	golang.org/x/net v0.26.0
 )
 
 require (
 	github.com/klauspost/cpuid/v2 v2.2.8 // indirect
 	github.com/stretchr/testify v1.8.1 // indirect
-	golang.org/x/net v0.26.0 // indirect
 	golang.org/x/text v0.16.0 // indirect
 )
 
