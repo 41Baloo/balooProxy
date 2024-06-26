@@ -4,6 +4,8 @@ go 1.19
 
 require (
 	github.com/boltdb/bolt v1.3.1
+	github.com/goccy/go-json v0.10.2
+	github.com/gofiber/fiber/v2 v2.48.0
 	github.com/kor44/gofilter v0.0.0-20171111115139-75787865c72c
 	github.com/zeebo/blake3 v0.2.3
 	golang.org/x/image v0.10.0
@@ -11,12 +13,7 @@ require (
 
 require (
 	github.com/andybalholm/brotli v1.0.5 // indirect
-	github.com/goccy/go-json v0.10.2 // indirect
-	github.com/gofiber/fiber v1.14.6 // indirect
-	github.com/gofiber/fiber/v2 v2.48.0 // indirect
-	github.com/gofiber/utils v0.0.10 // indirect
 	github.com/google/uuid v1.3.0 // indirect
-	github.com/gorilla/schema v1.1.0 // indirect
 	github.com/klauspost/compress v1.16.3 // indirect
 	github.com/klauspost/cpuid/v2 v2.0.12 // indirect
 	github.com/mattn/go-colorable v0.1.13 // indirect
@@ -24,6 +21,9 @@ require (
 	github.com/mattn/go-runewidth v0.0.14 // indirect
 	github.com/rivo/uniseg v0.2.0 // indirect
 	github.com/stretchr/testify v1.8.1 // indirect
+	github.com/valyala/bytebufferpool v1.0.0 // indirect
+	github.com/valyala/fasthttp v1.48.0 // indirect
+	github.com/valyala/tcplisten v1.0.0 // indirect
 )
 
 require (
