@@ -42,7 +42,7 @@ func Middleware(writer http.ResponseWriter, request *http.Request) {
 
 	if !domainFound {
 		writer.Header().Set("Content-Type", "text/plain")
-		SendResponse("balooProxy: "+domainName+" does not exist. If you are the owner please check your config.json if you believe this is a mistake", buffer, writer)
+		SendResponse("404 Not Found", buffer, writer)
 		return
 	}
 

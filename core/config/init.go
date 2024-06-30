@@ -90,12 +90,10 @@ func Load() {
 		utils.SetColor(domains.Config.Proxy.Colors)
 	}
 
-	if domains.Config.Proxy.RatelimitWindow != 0 {
-		if domains.Config.Proxy.RatelimitWindow < 10 {
-			domains.Config.Proxy.RatelimitWindow = 10
-		}
-		proxy.RatelimitWindow = domains.Config.Proxy.RatelimitWindow
+	if domains.Config.Proxy.RatelimitWindow < 10 {
+		domains.Config.Proxy.RatelimitWindow = 10
 	}
+	proxy.RatelimitWindow = domains.Config.Proxy.RatelimitWindow
 
 	proxy.IPRatelimit = domains.Config.Proxy.Ratelimits["requests"]
 	proxy.FPRatelimit = domains.Config.Proxy.Ratelimits["unknownFingerprint"]
