@@ -28,11 +28,11 @@ func Middleware(c *fiber.Ctx) error {
 	reqHeaders := c.GetReqHeaders()
 	domainName := utils.SafeString(reqHeaders["Host"])
 	firewall.Mutex.RLock()
-	domainData := domains.DomainsData[domainName]
+	domainData, domainFound := domains.DomainsData[domainName]
 	firewall.Mutex.RUnlock()
 
-	if domainData.Stage == 0 {
-		c.SendString("balooProxy: " + domainName + " does not exist. If you are the owner please check your config.json if you believe this is a mistake")
+	if !domainFound {
+		c.SendString("404 Not Found")
 		return nil
 	}
 
