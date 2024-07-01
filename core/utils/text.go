@@ -18,8 +18,21 @@ var (
 )
 
 // Only run in locked thread
-func AddLogs(entry string, domainName string) domains.DomainData {
+func AddLogs(entry domains.DomainLog, domainName string) {
+	domainData := domains.DomainsData[domainName]
+	domainData.LastLogs = append(domainData.LastLogs, entry)
+	domains.DomainsData[domainName] = domainData
+}
 
+func FormatLogs(log domains.DomainLog) string {
+	if log.BrowserFP != "" || log.BotFP != "" {
+		return "[ " + PrimaryColor(log.Time) + " ] > \033[35m" + log.IP + "\033[0m - \033[32m" + log.BrowserFP + log.BotFP + "\033[0m - " + PrimaryColor(log.Useragent) + " - " + PrimaryColor(log.Path)
+	}
+	return "[ " + PrimaryColor(log.Time) + " ] > \033[35m" + log.IP + "\033[0m - \033[31mUNK (" + log.TLSFP + ")\033[0m - " + PrimaryColor(log.Useragent) + " - " + PrimaryColor(log.Path)
+}
+
+// Only run in locked thread
+func ReadLogs(domainName string) {
 	domainData := domains.DomainsData[domainName]
 
 	//Calculate how close we are to overflowing
@@ -27,42 +40,28 @@ func AddLogs(entry string, domainName string) domains.DomainData {
 
 	if logOverflow > 0 {
 
-		// Remove overflown element(s) and append new log entry
-		domainData.LastLogs = append(domainData.LastLogs[logOverflow:], entry)
+		// Remove overflown element(s)
+		domainData.LastLogs = domainData.LastLogs[logOverflow:]
 
-		if proxy.RealTimeLogs {
-			PrintMutex.Lock()
-			for i, log := range domainData.LastLogs {
-				// Check if out log is too big to display fully
-				if len(log)+4 > proxy.TWidth {
-					fmt.Print("\033[" + fmt.Sprint(11+i) + ";1H\033[K[" + PrimaryColor("!") + "] " + log[:len(log)-(len(log)+4-proxy.TWidth)] + " ...\033[0m\n")
-				} else {
-					fmt.Print("\033[" + fmt.Sprint(11+i) + ";1H\033[K[" + PrimaryColor("!") + "] " + log + "\n")
-				}
-			}
-			MoveInputLine()
-			PrintMutex.Unlock()
-		}
-
-		domains.DomainsData[domainName] = domainData
-
-		return domainData
 	}
-	domainData.LastLogs = append(domainData.LastLogs, entry)
-	if domainName == proxy.WatchedDomain && proxy.RealTimeLogs {
-		PrintMutex.Lock()
-		if len(entry)+4 > proxy.TWidth {
-			fmt.Print("\033[" + fmt.Sprint((10 + len(domainData.LastLogs))) + ";1H\033[K[" + PrimaryColor("-") + "] " + entry[:len(entry)-(len(entry)+4-proxy.TWidth)] + " ...\033[0m\n")
+
+	PrintMutex.Lock()
+	for i, log := range domainData.LastLogs {
+		// Check if out log is too big to display fully
+
+		parsedOut := FormatLogs(log)
+
+		if len(parsedOut)+4 > proxy.TWidth {
+			fmt.Print("\033[" + fmt.Sprint(11+i) + ";1H\033[K[" + PrimaryColor("-") + "] " + parsedOut[:len(parsedOut)-(len(parsedOut)+4-proxy.TWidth)] + " ...\033[0m\n")
 		} else {
-			fmt.Print("\033[" + fmt.Sprint((10 + len(domainData.LastLogs))) + ";1H\033[K[" + PrimaryColor("-") + "] " + entry + "\n")
+			fmt.Print("\033[" + fmt.Sprint(11+i) + ";1H\033[K[" + PrimaryColor("-") + "] " + parsedOut + "\n")
 		}
-		MoveInputLine()
-		PrintMutex.Unlock()
 	}
+	MoveInputLine()
+	PrintMutex.Unlock()
 
 	domains.DomainsData[domainName] = domainData
 
-	return domainData
 }
 
 // Only run in locked thread

@@ -107,6 +107,9 @@ func handleProxyActions(action string, writer http.ResponseWriter) {
 		firewall.Mutex.Unlock()
 
 		APIResponse(writer, true, map[string]interface{}{})
+	case "RELOAD":
+		firewall.Mutex.Lock()
+		firewall.Mutex.Unlock()
 	default:
 		APIResponse(writer, false, map[string]interface{}{
 			"ERROR": ERR_ACTION_NOT_FOUND,
@@ -136,7 +139,6 @@ func handleDomainActions(action string, writer http.ResponseWriter, domainData *
 		APIResponse(writer, true, map[string]interface{}{
 			"FIREWALL_RULES": domainSettings.RawCustomRules,
 		})
-	// This is still janky since it contains the formatting from the console & also changes size depending on the console size
 	case "GET_LOGS":
 		APIResponse(writer, true, map[string]interface{}{
 			"LOGS": domainData.LastLogs,

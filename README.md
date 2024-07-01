@@ -207,11 +207,6 @@ The command `domain` followed by the name of a domain allows you to switch betwe
 
 The command `add` prompts you with questions to add another domain to your proxy (**Note**: This can be done in the config.json aswell, however that currently requires your proxy to restart to apply the changes)
 
-### `rtlogs`
-
-The command `rtlogs` enables "real time logs", meaning the terminal log will not, like usually, update every second with the latest logs but will instead instantly update, as soon as there is another request to log. Notice, this might require a lot of cpu when your proxy is getting attacked
-
-
 ### `reload`
 
 The command `reload` will cause the proxy to read the config.json again, aswell as reset some other generic settings, in order to apply changes from your config.json (**NOTE**: This is automatically executed every 5 hours)

@@ -49,8 +49,6 @@ var (
 	FailChallengeRatelimit int
 	FailRequestRatelimit   int
 
-	RealTimeLogs = false
-
 	CurrHour               int
 	CurrHourStr            string
 	LastSecondTime         time.Time

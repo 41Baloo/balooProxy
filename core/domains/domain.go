@@ -58,6 +58,16 @@ type DomainSettings struct {
 	DisableRawStage2    int
 }
 
+type DomainLog struct {
+	Time      string
+	IP        string
+	BrowserFP string
+	BotFP     string
+	TLSFP     string
+	Useragent string
+	Path      string
+}
+
 type DomainData struct {
 	Name             string
 	Stage            int
@@ -67,7 +77,7 @@ type DomainData struct {
 	BypassAttack     bool
 	BufferCooldown   int
 
-	LastLogs []string
+	LastLogs []DomainLog
 
 	TotalRequests    int
 	BypassedRequests int

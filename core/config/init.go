@@ -179,7 +179,7 @@ func Load() {
 			Stage2Difficulty: domain.Stage2Difficulty,
 			RawAttack:        false,
 			BypassAttack:     false,
-			LastLogs:         []string{},
+			LastLogs:         []domains.DomainLog{},
 
 			TotalRequests:    0,
 			BypassedRequests: 0,
@@ -208,7 +208,7 @@ func Load() {
 		RawAttack:        false,
 		BypassAttack:     false,
 		BufferCooldown:   0,
-		LastLogs:         []string{},
+		LastLogs:         []domains.DomainLog{},
 
 		TotalRequests:    0,
 		BypassedRequests: 0,
