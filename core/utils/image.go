@@ -40,3 +40,17 @@ func WarpImg(src image.Image, displacement func(x, y int) (int, int)) *image.RGB
 	}
 	return dst
 }
+
+func DrawTriangle(blacklist map[[2]int]bool, src, dst *image.RGBA, x, y, size int, shift int) map[[2]int]bool {
+	for i := 0; i < size; i++ {
+		for j := 0; j < size-i; j++ {
+			if !blacklist[[2]int{x + i, y + j}] {
+				dst.Set(x+i+shift, y+j, src.At(x+i, y+j))
+				src.Set(x+i, y+j, color.RGBA{0, 0, 0, 0}) // Should probably be 0, might confuse bots tho and good for debugging
+				blacklist[[2]int{x + i, y + j}] = true
+			}
+		}
+	}
+
+	return blacklist
+}
