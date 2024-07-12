@@ -35,11 +35,9 @@ func Monitor() {
 
 	defer pnc.PanicHndl()
 
-	//
 	PrintMutex.Lock()
 	screen.Clear()
 	screen.MoveTopLeft()
-	//
 	PrintMutex.Unlock()
 
 	proxy.LastSecondTime = time.Now()
@@ -61,14 +59,11 @@ func Monitor() {
 	//Responsible for keeping track of ratelimit
 	go evaluateRatelimit()
 
-	//
 	PrintMutex.Lock()
 	fmt.Println("\033[" + fmt.Sprint(11+proxy.MaxLogLength) + ";1H")
 	fmt.Print("[ " + utils.PrimaryColor("Command") + " ]: \033[s")
-	//
 	PrintMutex.Unlock()
 	for {
-		//
 		PrintMutex.Lock()
 		tempWidth, tempHeight, _ := term.GetSize(int(os.Stdout.Fd()))
 		proxy.TWidth = tempWidth + 18
