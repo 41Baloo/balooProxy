@@ -277,7 +277,9 @@ func printStats() {
 		fmt.Println("")
 		fmt.Println("[ " + utils.PrimaryColor("Latest Logs") + " ]")
 
+		firewall.Mutex.Lock()
 		utils.ReadLogs(proxy.WatchedDomain)
+		firewall.Mutex.Unlock()
 	}
 
 	utils.MoveInputLine()
