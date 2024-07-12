@@ -321,16 +321,16 @@ func commands() {
 					domainData.Stage = 1
 					domainData.StageManuallySet = false
 
-					firewall.Mutex.RLock()
+					firewall.Mutex.Lock()
 					domains.DomainsData[proxy.WatchedDomain] = domainData
-					firewall.Mutex.RUnlock()
+					firewall.Mutex.Unlock()
 				} else {
 					domainData.Stage = stage
 					domainData.StageManuallySet = true
 
-					firewall.Mutex.RLock()
+					firewall.Mutex.Lock()
 					domains.DomainsData[proxy.WatchedDomain] = domainData
-					firewall.Mutex.RUnlock()
+					firewall.Mutex.Unlock()
 				}
 			case "domain":
 				if len(details) < 2 {
