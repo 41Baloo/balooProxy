@@ -12,6 +12,7 @@ import (
 	"image/color"
 	"image/draw"
 	"image/png"
+	"log"
 	"math"
 	"math/rand"
 	"net"
@@ -86,6 +87,13 @@ func Middleware(writer http.ResponseWriter, request *http.Request) {
 	}
 
 	firewall.Mutex.Lock()
+	// Leaving this here for future reference. When the monitor thread that's supposed to prefill these maps lags 
+	//behind for some reason, this will be come really messy. The mutex will be locked and never unlocked again, 
+	//freezing the entire proxy
+	/*_, temp_found := firewall.WindowAccessIps[proxy.Last10SecondTimestamp]
+	if !temp_found {
+		log.Printf("Attempting To Set %s, %d but timestamp hasn't been set yet ?!?", ip, proxy.Last10SecondTimestamp)
+	}*/
 	firewall.WindowAccessIps[proxy.Last10SecondTimestamp][ip]++
 	domainData = domains.DomainsData[domainName]
 	domainData.TotalRequests++

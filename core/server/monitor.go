@@ -35,9 +35,11 @@ func Monitor() {
 
 	defer pnc.PanicHndl()
 
+	//
 	PrintMutex.Lock()
 	screen.Clear()
 	screen.MoveTopLeft()
+	//
 	PrintMutex.Unlock()
 
 	proxy.LastSecondTime = time.Now()
@@ -59,11 +61,14 @@ func Monitor() {
 	//Responsible for keeping track of ratelimit
 	go evaluateRatelimit()
 
+	//
 	PrintMutex.Lock()
 	fmt.Println("\033[" + fmt.Sprint(11+proxy.MaxLogLength) + ";1H")
 	fmt.Print("[ " + utils.PrimaryColor("Command") + " ]: \033[s")
+	//
 	PrintMutex.Unlock()
 	for {
+		//
 		PrintMutex.Lock()
 		tempWidth, tempHeight, _ := term.GetSize(int(os.Stdout.Fd()))
 		proxy.TWidth = tempWidth + 18
@@ -277,9 +282,7 @@ func printStats() {
 		fmt.Println("")
 		fmt.Println("[ " + utils.PrimaryColor("Latest Logs") + " ]")
 
-		firewall.Mutex.Lock()
 		utils.ReadLogs(proxy.WatchedDomain)
-		firewall.Mutex.Unlock()
 	}
 
 	utils.MoveInputLine()
@@ -585,14 +588,17 @@ func evaluateRatelimit() {
 
 		firewall.Mutex.Lock()
 		//Initialise Maps before they're ever written, as to save if statements during potential attack
-		for i := proxy.Last10SecondTimestamp; i < proxy.Last10SecondTimestamp+20; i = i + 10 {
+		for i := proxy.Last10SecondTimestamp; i < proxy.Last10SecondTimestamp+120; i = i + 10 {
 			if firewall.WindowAccessIps[i] == nil {
+				//log.Printf("Set AccessIPs Windows For %d", i)
 				firewall.WindowAccessIps[i] = map[string]int{}
 			}
 			if firewall.WindowAccessIpsCookie[i] == nil {
+				//log.Printf("Set AccessIPsCookie Windows For %d", i)
 				firewall.WindowAccessIpsCookie[i] = map[string]int{}
 			}
 			if firewall.WindowUnkFps[i] == nil {
+				//log.Printf("Set AccessUnkFps Windows For %d", i)
 				firewall.WindowUnkFps[i] = map[string]int{}
 			}
 		}
@@ -601,6 +607,7 @@ func evaluateRatelimit() {
 		firewall.AccessIps = map[string]int{}
 		for windowTime, accessIPs := range firewall.WindowAccessIps {
 			if utils.TrimTime(windowTime)+proxy.RatelimitWindow < proxy.LastSecondTimestamp {
+				//log.Printf("Deleting AccessIPs Windows For %d", windowTime)
 				delete(firewall.WindowAccessIps, windowTime)
 			} else {
 				for IP, requests := range accessIPs {
@@ -611,6 +618,7 @@ func evaluateRatelimit() {
 		firewall.AccessIpsCookie = map[string]int{}
 		for windowTime, accessIPsCookie := range firewall.WindowAccessIpsCookie {
 			if utils.TrimTime(windowTime)+proxy.RatelimitWindow < proxy.LastSecondTimestamp {
+				//log.Printf("Deleting AccessIPsCookie Windows For %d", windowTime)
 				delete(firewall.WindowAccessIpsCookie, windowTime)
 			} else {
 				for IP, requests := range accessIPsCookie {
@@ -621,6 +629,7 @@ func evaluateRatelimit() {
 		firewall.UnkFps = map[string]int{}
 		for windowTime, unkFps := range firewall.WindowUnkFps {
 			if utils.TrimTime(windowTime)+proxy.RatelimitWindow < proxy.LastSecondTimestamp {
+				//log.Printf("Deleting AccessUnkFps Windows For %d", windowTime)
 				delete(firewall.WindowUnkFps, windowTime)
 			} else {
 				for IP, requests := range unkFps {
@@ -631,6 +640,7 @@ func evaluateRatelimit() {
 		firewall.Mutex.Unlock()
 		proxy.Initialised = true
 
+		//log.Printf("I Ran. I'm supposed to run every 5 seconds. If that didn't happen we're in deep shit")
 		time.Sleep(5 * time.Second)
 
 	}

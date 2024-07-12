@@ -29,7 +29,7 @@ func main() {
 	defer pnc.PanicHndl()
 
 	//Disable Error Logging
-	log.SetOutput(io.Discard)
+	log.SetOutput(io.Discard /*logFile*/) // if we ever need to log to a file
 
 	fmt.Println("Starting Proxy ...")
 

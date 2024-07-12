@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"goProxy/core/domains"
+	"goProxy/core/firewall"
 	"goProxy/core/proxy"
 	"os"
 	"strconv"
@@ -33,7 +34,9 @@ func FormatLogs(log domains.DomainLog) string {
 
 // Only run in locked thread
 func ReadLogs(domainName string) {
+	firewall.Mutex.RLock()
 	domainData := domains.DomainsData[domainName]
+	firewall.Mutex.RUnlock()
 
 	//Calculate how close we are to overflowing
 	logOverflow := len(domainData.LastLogs) - proxy.MaxLogLength
@@ -42,7 +45,9 @@ func ReadLogs(domainName string) {
 
 		// Remove overflown element(s)
 		domainData.LastLogs = domainData.LastLogs[logOverflow:]
-
+		firewall.Mutex.Lock()
+		domains.DomainsData[domainName] = domainData
+		firewall.Mutex.Unlock()
 	}
 
 	for i, log := range domainData.LastLogs {
@@ -57,9 +62,6 @@ func ReadLogs(domainName string) {
 		}
 	}
 	MoveInputLine()
-
-	domains.DomainsData[domainName] = domainData
-
 }
 
 // Only run in locked thread
