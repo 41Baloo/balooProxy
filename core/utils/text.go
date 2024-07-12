@@ -45,7 +45,6 @@ func ReadLogs(domainName string) {
 
 	}
 
-	PrintMutex.Lock()
 	for i, log := range domainData.LastLogs {
 		// Check if out log is too big to display fully
 
@@ -58,7 +57,6 @@ func ReadLogs(domainName string) {
 		}
 	}
 	MoveInputLine()
-	PrintMutex.Unlock()
 
 	domains.DomainsData[domainName] = domainData
 
