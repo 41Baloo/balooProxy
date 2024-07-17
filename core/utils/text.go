@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"goProxy/core/domains"
+	"goProxy/core/firewall"
 	"goProxy/core/proxy"
 	"os"
 	"strconv"
@@ -17,10 +18,11 @@ var (
 	ColorsString = "0;31"
 )
 
-// Only run in locked thread
 func AddLogs(entry string, domainName string) domains.DomainData {
 
+	firewall.Mutex.Lock()
 	domainData := domains.DomainsData[domainName]
+	firewall.Mutex.Unlock()
 
 	//Calculate how close we are to overflowing
 	logOverflow := len(domainData.LastLogs) - proxy.MaxLogLength
@@ -44,7 +46,9 @@ func AddLogs(entry string, domainName string) domains.DomainData {
 			PrintMutex.Unlock()
 		}
 
+		firewall.Mutex.Lock()
 		domains.DomainsData[domainName] = domainData
+		firewall.Mutex.Unlock()
 
 		return domainData
 	}
@@ -60,7 +64,9 @@ func AddLogs(entry string, domainName string) domains.DomainData {
 		PrintMutex.Unlock()
 	}
 
+	firewall.Mutex.Lock()
 	domains.DomainsData[domainName] = domainData
+	firewall.Mutex.Unlock()
 
 	return domainData
 }

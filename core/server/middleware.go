@@ -490,14 +490,10 @@ padding: 20px;
 	//Access logs of clients that passed the challenge
 	if browser != "" || botFp != "" {
 		access := "[ " + utils.PrimaryColor(proxy.LastSecondTimeFormated) + " ] > \033[35m" + ip + "\033[0m - \033[32m" + browser + botFp + "\033[0m - " + utils.PrimaryColor(reqUa) + " - " + utils.PrimaryColor(cOURL)
-		firewall.Mutex.Lock()
 		domainData = utils.AddLogs(access, domainName)
-		firewall.Mutex.Unlock()
 	} else {
 		access := "[ " + utils.PrimaryColor(proxy.LastSecondTimeFormated) + " ] > \033[35m" + ip + "\033[0m - \033[31mUNK (" + tlsFp + ")\033[0m - " + utils.PrimaryColor(reqUa) + " - " + utils.PrimaryColor(cOURL)
-		firewall.Mutex.Lock()
 		domainData = utils.AddLogs(access, domainName)
-		firewall.Mutex.Unlock()
 	}
 
 	firewall.Mutex.Lock()
