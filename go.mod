@@ -6,7 +6,7 @@ require (
 	github.com/boltdb/bolt v1.3.1
 	github.com/kor44/gofilter v0.0.0-20171111115139-75787865c72c
 	github.com/zeebo/blake3 v0.2.3
-	golang.org/x/image v0.17.0
+	golang.org/x/image v0.18.0
 	golang.org/x/net v0.26.0
 )
 
