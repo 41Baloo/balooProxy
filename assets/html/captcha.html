@@ -196,7 +196,7 @@
    function checkAnswer(e) {
      e.preventDefault();
      var t = document.getElementById("text").value;
-     document.cookie = "`+ip+`_3__bProxy_v=" + t + "`+publicPart+`; SameSite=Lax; path=/; Secure", fetch("https://" + location.hostname + "/_bProxy/verified").then(function(e) {
+     document.cookie = "`+ip+`_3__bProxy_v=" + t + "{{publicPart}}; SameSite=Lax; path=/; Secure", fetch("https://" + location.hostname + "/_bProxy/verified").then(function(e) {
        return e.text()
      }).then(function(e) {
        "verified" === e ? (document.getElementById("successMessage").style.display = "block", setInterval(function() {
@@ -218,10 +218,10 @@
    }
    captcha_image.onload = function() {
      captcha_ctx.drawImage(captcha_image, (captcha_canvas.width - captcha_image.width) / 2, (captcha_canvas.height - captcha_image.height) / 2)
-   }, captcha_image.src = "data:image/png;base64,`+captchaData+`";
+   }, captcha_image.src = "data:image/png;base64,{{captchaData}}";
    mask_image.onload = function() {
      mask_ctx.drawImage(mask_image, (mask_canvas.width - mask_image.width) / 2, (mask_canvas.height - mask_image.height) / 2)
-   }, mask_image.src = "data:image/png;base64,`+maskData+`";
+   }, mask_image.src = "data:image/png;base64,{{maskData}}";
 
   let demo_int = setInterval(() => {
        if (!demo_slider) {

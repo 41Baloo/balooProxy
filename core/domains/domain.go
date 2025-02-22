@@ -93,6 +93,15 @@ type DomainData struct {
 
 type Proxy struct {
 	Cloudflare      bool              `json:"cloudflare"`
+
+	/// Redis
+
+	RedisHost       string            `json:"RedisHost"`
+	RedisHaveAuthentification bool    `json:"RedisHaveAuthentification"`
+	RedisPass string                  `json:"RedisPass"`
+	RedisDB int                   `json:"RedisDB"`
+	UseRedis bool                   `json:"UseRedis"`
+
 	AdminSecret     string            `json:"adminsecret"`
 	APISecret       string            `json:"apisecret"`
 	Secrets         map[string]string `json:"secrets"`

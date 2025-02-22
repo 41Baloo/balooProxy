@@ -1,0 +1,277 @@
+<style>
+    body {
+      background-color: #f5f5f5;
+      font-family: Arial, sans-serif;
+    }
+  
+    .center {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+    }
+  
+    .box {
+      background-color: #fff;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      padding: 20px;
+      width: 500px;
+      transition: height .1s;
+    }
+  
+    .box * {
+      transition: opacity .1s;
+    }
+  
+    canvas {
+      display: block;
+      margin: 0 auto;
+      max-width: 100%;
+      width: 100%;
+      height: auto;
+    }
+  
+    input[type=text] {
+      width: 100%;
+      padding: 12px 20px;
+      margin: 8px 0;
+      box-sizing: border-box;
+      border: 2px solid #ccc;
+      border-radius: 4px;
+    }
+  
+    button {
+      width: 100%;
+      background-color: #4caf50;
+      color: #fff;
+      padding: 14px 20px;
+      margin: 8px 0;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+  
+    button:hover {
+      background-color: #45a049;
+    }
+  
+    .success {
+      background-color: #dff0d8;
+      border: 1px solid #d6e9c6;
+      border-radius: 4px;
+      color: #3c763d;
+      padding: 20px;
+    }
+  
+    .failure {
+      background-color: #f0d8d8;
+      border: 1px solid #e9c6c6;
+      border-radius: 4px;
+      color: #763c3c;
+      padding: 20px;
+    }
+  
+    .collapsible {
+      background-color: #f5f5f5;
+      color: #444;
+      cursor: pointer;
+      padding: 18px;
+      width: 100%;
+      border: none;
+      text-align: left;
+      outline: 0;
+      font-size: 15px;
+    }
+  
+    .collapsible:after {
+      content: '\002B';
+      color: #777;
+      font-weight: 700;
+      float: right;
+      margin-left: 5px;
+    }
+  
+    .collapsible.active:after {
+      content: "\2212";
+    }
+  
+    .collapsible:hover {
+      background-color: #e5e5e5;
+    }
+  
+    .collapsible-content {
+      padding: 0 18px;
+      max-height: 0;
+      overflow: hidden;
+      transition: max-height .2s ease-out;
+      background-color: #f5f5f5;
+    }
+  
+    .captcha-wrapper {
+      position: relative;
+      width: 100%;
+      height: 200px;
+    }
+  
+    .captcha-wrapper canvas {
+      position: absolute;
+    }
+  
+    input[type=range] {
+      -webkit-appearance: none;
+      width: 100%;
+      height: 25px;
+      background: #ddd;
+      outline: 0;
+      opacity: .7;
+      transition: opacity .2s;
+      border-radius: 4px;
+      margin: 8px 0;
+    }
+  
+    input[type=range]:hover {
+      opacity: 1;
+    }
+  
+    input[type=range]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 25px;
+      height: 25px;
+      background: #4caf50;
+      cursor: pointer;
+      border-radius: 50%;
+    }
+  
+    input[type=range]::-moz-range-thumb {
+      width: 25px;
+      height: 25px;
+      background: #4caf50;
+      cursor: pointer;
+      border-radius: 50%;
+    }
+  </style>
+  
+  <div class="center" id="center">
+    <div class="box" id="box">
+      <h1>Drag the <b>slider</b> and enter the <b>green</b> text you see in the picture</h1>
+      <div class="captcha-wrapper">
+        <canvas height="37" id="captcha" width="100"></canvas>
+        <canvas height="37" id="mask" width="100"></canvas>
+      </div>
+      <input id="captcha-slider" max="50" min="-50" type="range">
+      <form onsubmit="return checkAnswer(event)">
+        <input id="text" type="text" maxlength="6" placeholder="Solution required"> 
+        <button type="submit">Submit</button>
+      </form>
+      <div class="success" id="successMessage" style="display:none">Success! Redirecting ...</div>
+      <div class="failure" id="failMessage" style="display:none">Failed! Please try again.</div>
+      <button class="collapsible">Why am I seeing this page?</button>
+      <div class="collapsible-content">
+        <p>The website you are trying to visit needs to make sure that you are not a bot. This is a common security measure to protect websites from automated spam and abuse. By entering the characters you see in the picture, you are helping to verify that you are a real person.</p>
+      </div>
+    </div>
+  </div>
+  
+  <script>
+    let captcha_canvas = document.getElementById("captcha");
+    let captcha_ctx = captcha_canvas.getContext("2d");
+    let mask_canvas = document.getElementById("mask");
+    let mask_ctx = mask_canvas.getContext("2d");
+    let slider = document.getElementById("captcha-slider");
+    let demo_slider = false;
+    let demo_val = 1;
+  
+    let i, captcha_image = new Image(), mask_image = new Image();
+  
+    function checkAnswer(e) {
+      e.preventDefault();
+      var a = document.getElementById("text").value;
+      document.cookie = "{{ip}}_3__bProxy_v=" + a + "{{publicPart}};" + " SameSite=Lax; path=/; Secure";
+      
+      fetch("https://" + location.hostname + "/_bProxy/verified")
+        .then(function (e) { return e.text(); })
+        .then(function (e) {
+          if ("verified" === e) {
+            document.getElementById("successMessage").style.display = "block";
+            setInterval(function () {
+              var e = document.getElementById("box");
+              var a = e.offsetHeight;
+              var t = setInterval(function () {
+                a -= 20;
+                e.style.height = a + "px";
+                for (var c = e.children, s = 0; s < c.length; s++) {
+                  c[s].style.opacity = 0;
+                }
+                if (a <= 0) {
+                  e.style.height = "0";
+                  e.remove();
+                  clearInterval(t);
+                  location.href = location.href;
+                }
+              }, 20);
+            }, 1000);
+          } else {
+            document.getElementById("failMessage").style.display = "block";
+            setInterval(function () {
+              location.href = location.href;
+            }, 1000);
+          }
+        })
+        .catch(function (e) {
+          document.getElementById("failMessage").style.display = "block";
+          setInterval(function () {
+            location.href = location.href;
+          }, 1000);
+        });
+    }
+  
+    captcha_image.onload = function () {
+      captcha_ctx.drawImage(captcha_image, (captcha_canvas.width - captcha_image.width) / 2, (captcha_canvas.height - captcha_image.height) / 2);
+    };
+  
+    captcha_image.src = "data:image/png;base64,{{captchaData}}";
+  
+    mask_image.onload = function () {
+      mask_ctx.drawImage(mask_image, (mask_canvas.width - mask_image.width) / 2, (mask_canvas.height - mask_image.height) / 2);
+    };
+  
+    mask_image.src = "data:image/png;base64,{{maskData}}";
+  
+    let demo_int = setInterval(() => {
+      if (!demo_slider) {
+        clearInterval(demo_int);
+        return;
+      }
+      if (slider.value <= -50) {
+        demo_val = 1;
+      }
+      if (slider.value >= 50) {
+        demo_val = -1;
+      }
+      slider.value = parseInt(slider.value) + demo_val;
+      updateCaptcha();
+    }, 50);
+  
+    function updateCaptcha() {
+      let e = parseInt(slider.value);
+      mask_ctx.clearRect(0, 0, mask_canvas.width, mask_canvas.height);
+      mask_ctx.drawImage(mask_image, (mask_canvas.width - mask_image.width) / 2 + e, 0);
+    }
+  
+    slider.oninput = function () {
+      demo_slider = false;
+      updateCaptcha();
+    };
+  
+    var coll = document.getElementsByClassName("collapsible");
+    for (i = 0; i < coll.length; i++) {
+      coll[i].addEventListener("click", function () {
+        this.classList.toggle("active");
+        var e = this.nextElementSibling;
+        e.style.maxHeight ? e.style.maxHeight = null : e.style.maxHeight = e.scrollHeight + "px";
+      });
+    }
+  </script>
+  

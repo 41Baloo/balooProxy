@@ -20,6 +20,11 @@ func Generate() {
 	gConfig := domains.Configuration{
 		Proxy: domains.Proxy{
 			Cloudflare:  utils.AskBool("Use This Proxy With Cloudflare? (y/N)", false),
+			RedisHost: "127.0.0.1:6379",
+			RedisHaveAuthentification: false,
+			RedisPass: "",
+			RedisDB: 0,
+			UseRedis: false,
 			AdminSecret: utils.RandomString(25),
 			APISecret:   utils.RandomString(30),
 			Timeout: domains.TimeoutSettings{

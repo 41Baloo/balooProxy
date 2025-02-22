@@ -6,6 +6,7 @@ import (
 	"goProxy/core/pnc"
 	"goProxy/core/proxy"
 	"goProxy/core/server"
+	"goProxy/core/utils"
 	"io"
 	"log"
 	"os"
@@ -38,6 +39,14 @@ func main() {
 	fmt.Println("Loaded Config ...")
 
 	// Wait for everything to be initialised
+
+	// Load redis 
+	if (proxy.UseRedis) {
+		fmt.Println("Loading redis")
+		utils.StartRedisPubSub()
+	}
+	
+
 	fmt.Println("Initialising ...")
 	go server.Monitor()
 	for !proxy.Initialised {

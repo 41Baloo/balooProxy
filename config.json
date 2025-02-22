@@ -1,0 +1,150 @@
+{
+    "proxy": {
+        "cloudflare": true,
+        "RedisHost": "127.0.0.1:6379",
+        "RedisHaveAuthentification": false,
+        "RedisPass": false,
+        "RedisDB": 0,
+        "UseRedis": true,
+        "maxLogLength": 5,
+        "adminsecret": "aaa",
+        "apisecret": "aaa",
+        "secrets": {
+            "captcha": "aaa",
+            "cookie": "aaa",
+            "javascript": "aaa"
+        },
+        "timeout": {
+            "idle": 5,
+            "read": 5,
+            "write": 7,
+            "read_header": 5
+        },
+        "ratelimits": {
+            "challengeFailures": 40,
+            "noRequestsSent": 10,
+            "requests": 500,
+            "unknownFingerprint": 150
+        },
+        "colors": [
+            "0",
+            "31"
+        ]
+    },
+    "domains": [
+        {
+            "name": "baloo.one",
+            "backend": "[::1]",
+            "scheme": "http",
+            "certificate": "assets/server/server.crt",
+            "key": "assets/server/server.key",
+            "webhook": {
+                "url": "https://discord.com/api/webhooks/1055573557880569886/XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX",
+                "name": "balooProxy",
+                "avatar": "https://avatars.githubusercontent.com/u/73783549",
+                "attack_start_msg": "A DDoS attack has been detected against your domain `{{domain.name}}`",
+                "attack_stop_msg": "The DDoS attack against your domain `{{domain.name}}` has stopped"
+            },
+            "firewallRules": [
+                {
+                    "expression": "(http.path eq \"/captcha\")",
+                    "action": "3"
+                },
+                {
+                    "expression": "(http.path eq \"/js\")",
+                    "action": "2"
+                },
+                {
+                    "expression": "(ip.engine eq \"\" or ((ip.engine eq \"Firefox\" and http.user_agent contains \"chrome\") or (ip.engine eq \"Chromium\" and http.user_agent contains \"firefox\")))",
+                    "action": "+1"
+                },
+                {
+                    "expression": "(http.method ne \"GET\" and http.method ne \"POST\")",
+                    "action": "+2"
+                }
+            ],
+            "bypassStage1": 75,
+            "bypassStage2": 250,
+            "disableBypassStage3": 100,
+            "disableRawStage3": 250,
+            "disableBypassStage2": 50,
+            "disableRawStage2": 75
+        },
+        {
+            "name": "9090.baloo.dog",
+            "backend": "1.1.1.1:9090",
+            "scheme": "http",
+            "certificate": "assets/server/server.crt",
+            "key": "assets/server/server.key",
+            "webhook": {
+                "url": "https://discord.com/api/webhooks/1055573557880569886/XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX",
+                "name": "balooProxy",
+                "avatar": "https://avatars.githubusercontent.com/u/73783549",
+                "attack_start_msg": "A DDoS attack has been detected against your domain `{{domain.name}}`",
+                "attack_stop_msg": "The DDoS attack against your domain `{{domain.name}}` has stopped"
+            },
+            "firewallRules": [
+                {
+                    "expression": "(http.path eq \"/captcha\")",
+                    "action": "3"
+                },
+                {
+                    "expression": "(http.path eq \"/js\")",
+                    "action": "2"
+                },
+                {
+                    "expression": "(ip.engine eq \"\" or ((ip.engine eq \"Firefox\" and http.user_agent contains \"chrome\") or (ip.engine eq \"Chromium\" and http.user_agent contains \"firefox\")))",
+                    "action": "+1"
+                },
+                {
+                    "expression": "(http.method ne \"GET\" and http.method ne \"POST\")",
+                    "action": "+2"
+                }
+            ],
+            "bypassStage1": 75,
+            "bypassStage2": 250,
+            "disableBypassStage3": 100,
+            "disableRawStage3": 250,
+            "disableBypassStage2": 50,
+            "disableRawStage2": 75
+        },
+        {
+            "name": "baloo.dog",
+            "backend": "1.1.1.1",
+            "scheme": "http",
+            "certificate": "assets/server/server.crt",
+            "key": "assets/server/server.key",
+            "webhook": {
+                "url": "https://discord.com/api/webhooks/1055573557880569886/XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX",
+                "name": "balooProxy",
+                "avatar": "https://avatars.githubusercontent.com/u/73783549",
+                "attack_start_msg": "A DDoS attack has been detected against your domain `{{domain.name}}`",
+                "attack_stop_msg": "The DDoS attack against your domain `{{domain.name}}` has stopped"
+            },
+            "firewallRules": [
+                {
+                    "expression": "(http.path eq \"/captcha\")",
+                    "action": "3"
+                },
+                {
+                    "expression": "(http.path eq \"/js\")",
+                    "action": "2"
+                },
+                {
+                    "expression": "(ip.engine eq \"\" or ((ip.engine eq \"Firefox\" and http.user_agent contains \"chrome\") or (ip.engine eq \"Chromium\" and http.user_agent contains \"firefox\")))",
+                    "action": "+1"
+                },
+                {
+                    "expression": "(http.method ne \"GET\" and http.method ne \"POST\")",
+                    "action": "+2"
+                }
+            ],
+            "bypassStage1": 75,
+            "bypassStage2": 250,
+            "disableBypassStage3": 100,
+            "disableRawStage3": 250,
+            "disableBypassStage2": 50,
+            "disableRawStage2": 75
+        }
+    ]
+}

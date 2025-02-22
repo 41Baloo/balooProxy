@@ -13,6 +13,14 @@ var (
 	TWidth        int
 	THeight       int
 	Cloudflare    bool
+
+	/// redis config
+	RedisHost string
+	RedisHaveAuthentification bool
+	RedisPass string
+	RedisDB int
+	UseRedis bool
+	
 	MaxLogLength  int
 
 	CpuUsage string

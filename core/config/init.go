@@ -37,6 +37,13 @@ func Load() {
 
 	proxy.Cloudflare = domains.Config.Proxy.Cloudflare
 
+	/// redis config
+	proxy.RedisHost = domains.Config.Proxy.RedisHost
+	proxy.RedisHaveAuthentification = domains.Config.Proxy.RedisHaveAuthentification
+	proxy.RedisPass = domains.Config.Proxy.RedisPass
+	proxy.RedisDB = domains.Config.Proxy.RedisDB
+	proxy.UseRedis = domains.Config.Proxy.UseRedis
+
 	proxy.CookieSecret = domains.Config.Proxy.Secrets["cookie"]
 	if strings.Contains(proxy.CookieSecret, "CHANGE_ME") {
 		panic("[ " + utils.PrimaryColor("!") + " ] [ Cookie Secret Contains 'CHANGE_ME', Refusing To Load ]")

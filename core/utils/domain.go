@@ -1,12 +1,41 @@
 package utils
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"goProxy/core/domains"
 	"io/ioutil"
 	"strings"
+	"github.com/go-redis/redis/v8"
 )
+
+var ctx = context.Background()
+
+func connectRedis() *redis.Client {
+	var rdb *redis.Client
+
+	if domains.Config.Proxy.RedisHaveAuthentification {
+		rdb = redis.NewClient(&redis.Options{
+			Addr:     domains.Config.Proxy.RedisHost,
+			Password: domains.Config.Proxy.RedisPass,
+			DB:       domains.Config.Proxy.RedisDB,
+		})
+	} else {
+		rdb = redis.NewClient(&redis.Options{
+			Addr: domains.Config.Proxy.RedisHost, 
+			DB:   domains.Config.Proxy.RedisDB,
+		})
+	}
+
+	ctx := context.Background()
+	_, err := rdb.Ping(ctx).Result()
+	if err != nil {
+		panic("Redis connection failed: " + err.Error())
+	}
+
+	return rdb
+}
 
 func AddDomain() {
 	fmt.Println("[ " + PrimaryColor("No Domain Configurations Found") + " ]")
@@ -44,5 +73,67 @@ func AddDomain() {
 	err = ioutil.WriteFile("config.json", jsonConfig, 0644)
 	if err != nil {
 		panic(err)
+	}
+}
+
+func DeleteDomain(domainName string) {
+	for i, domain := range domains.Config.Domains {
+		if domain.Name == domainName {
+			domains.Config.Domains = append(domains.Config.Domains[:i], domains.Config.Domains[i+1:]...)
+			break
+		}
+	}
+
+	jsonConfig, err := json.Marshal(domains.Config)
+	if err != nil {
+		panic(err)
+	}
+
+	err = ioutil.WriteFile("config.json", jsonConfig, 0644)
+	if err != nil {
+		panic(err)
+	}
+}
+
+func StartRedisPubSub() {
+	rdb := connectRedis()
+
+	pubsub := rdb.Subscribe(ctx, "adddomain:*", "deldomain:*")
+	defer pubsub.Close()
+
+	for {
+		msg, err := pubsub.ReceiveMessage(ctx)
+		if err != nil {
+			panic(err)
+		}
+
+		commandParts := strings.Split(msg.Channel, ":")
+		if len(commandParts) != 2 {
+			continue
+		}
+
+		command := commandParts[0]
+		domainName := commandParts[1]
+
+		switch command {
+		case "adddomain":
+			var domain domains.Domain
+			if err := json.Unmarshal([]byte(msg.Payload), &domain); err != nil {
+				fmt.Println("error while decoding", err)
+				continue
+			}
+			domains.Config.Domains = append(domains.Config.Domains, domain)
+			jsonConfig, err := json.Marshal(domains.Config)
+			if err != nil {
+				fmt.Println("error while save", err)
+				continue
+			}
+			if err := ioutil.WriteFile("config.json", jsonConfig, 0644); err != nil {
+				fmt.Println("error while write", err)
+			}
+
+		case "deldomain":
+			DeleteDomain(domainName)
+		}
 	}
 }
